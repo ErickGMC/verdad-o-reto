@@ -111,14 +111,12 @@ export function useGameRoom(roomId: string | null) {
   // --- REAL-TIME LISTENER ---
   useEffect(() => {
     if (!roomId) {
-      const timeout = setTimeout(() => setRoom(null), 0);
-      return () => clearTimeout(timeout);
+      setRoom(null);
+      return;
     }
 
-    const stateTimeout = setTimeout(() => {
-      setLoading(true);
-      setError(null);
-    }, 0);
+    setLoading(true);
+    setError(null);
 
     if (isFirebaseConfigured && db) {
       // Firebase Mode: Listen to Firestore document updates
@@ -141,7 +139,6 @@ export function useGameRoom(roomId: string | null) {
       );
 
       return () => {
-        clearTimeout(stateTimeout);
         unsubscribe();
       };
     } else {
@@ -183,7 +180,6 @@ export function useGameRoom(roomId: string | null) {
       }
 
       return () => {
-        clearTimeout(stateTimeout);
         if (mockChannel) {
           mockChannel.removeEventListener('message', handleBroadcast);
         }
