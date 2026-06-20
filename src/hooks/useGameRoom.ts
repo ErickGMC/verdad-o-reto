@@ -695,6 +695,67 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
+  // 12. Leave Room securely
+  const leaveRoom = async () => {
+    await mutateRoomState((current) => {
+      const player = current.players[playerId];
+      if (!player) return null; // Already not in the room
+
+      // Remove player
+      const updatedPlayers = { ...current.players };
+      delete updatedPlayers[playerId];
+      
+      const updatedOrder = current.playerOrder.filter(id => id !== playerId);
+
+      // If room is empty
+      if (updatedOrder.length === 0) {
+        return {
+          ...current,
+          players: {},
+          playerOrder: []
+        };
+      }
+
+      let nextState: Room = {
+        ...current,
+        players: updatedPlayers,
+        playerOrder: updatedOrder
+      };
+
+      // Handle Creator leaving
+      if (current.creatorId === playerId) {
+        nextState.creatorId = updatedOrder[0];
+      }
+
+      // Handle Active Player leaving
+      if (current.currentTurn && current.currentTurn.activePlayerId === playerId && current.status !== 'LOBBY') {
+        // Skip turn to next person
+        const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
+        const nextPlayerId = updatedOrder[nextIdx];
+
+        nextState.status = 'SELECTING';
+        nextState.currentTurnIdx = nextIdx;
+        nextState.currentTurn = {
+          activePlayerId: nextPlayerId,
+          typeSelected: null,
+          content: '',
+          votes: {},
+          startedAt: Date.now()
+        };
+      } else if (current.currentTurn && current.status === 'VOTING') {
+        // If a voter leaves during voting, remove their vote if any
+        const updatedVotes = { ...current.currentTurn.votes };
+        delete updatedVotes[playerId];
+        nextState.currentTurn = {
+          ...current.currentTurn,
+          votes: updatedVotes
+        };
+      }
+
+      return nextState;
+    });
+  };
+
   return {
     room,
     playerId,
@@ -712,5 +773,6 @@ export function useGameRoom(roomId: string | null) {
     buySkill,
     triggerSkill,
     giftPoints,
+    leaveRoom,
   };
 }

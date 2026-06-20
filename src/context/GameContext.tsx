@@ -22,6 +22,7 @@ interface GameContextType {
   buySkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion') => Promise<void>;
   triggerSkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion', targetPlayerId?: string, customText?: string) => Promise<void>;
   giftPoints: (toPlayerId: string, amount: number) => Promise<void>;
+  leaveRoom: () => Promise<void>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -54,7 +55,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return code;
   };
 
-  const exitRoom = () => {
+  const exitRoom = async () => {
+    try {
+      await game.leaveRoom();
+    } catch (e) {
+      console.error('Error leaving room', e);
+    }
     setRoomId(null);
   };
 

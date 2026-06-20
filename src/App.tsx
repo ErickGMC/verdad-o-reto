@@ -12,22 +12,13 @@ import './App.css';
 const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
 
 function GameContent() {
-  const {
-    room,
-    currentRoomId,
-    setRoomId,
-    createRoom,
-    joinRoom,
-    loading,
-    error
-  } = useGame();
-
+  const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error } = useGame();
   const [name, setName] = useState<string>(() => sessionStorage.getItem('vor_player_name') || '');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🦊');
   const [joinCode, setJoinCode] = useState<string>('');
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [joinMode, setJoinMode] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [joinMode, setJoinMode] = useState<boolean>(false);
 
   // Check URL search parameters for automatic invite code redirection
   useEffect(() => {
@@ -74,9 +65,17 @@ function GameContent() {
     }
   };
 
-  const handleExit = () => {
+  const handleExit = async () => {
     if (window.confirm('¿Seguro que deseas salir de la partida actual?')) {
-      setRoomId(null);
+      setIsProcessing(true);
+      try {
+        await leaveRoom();
+        setRoomId(null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 

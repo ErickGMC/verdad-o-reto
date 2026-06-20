@@ -3,7 +3,7 @@ import { useGame } from '../context/GameContext';
 import { Copy, Share2, Crown, AlertCircle } from 'lucide-react';
 
 export const Lobby: React.FC = () => {
-  const { room, playerId, toggleReady, startGame, setRoomId } = useGame();
+  const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom } = useGame();
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
@@ -133,8 +133,8 @@ export const Lobby: React.FC = () => {
 
         {/* Actions buttons */}
         <div className="lobby-actions">
-          <button onClick={() => setRoomId(null)} className="cta-button secondary" disabled={processingAction !== null}>
-            Salir de la Sala
+          <button onClick={() => handleAction('leave', async () => { await leaveRoom(); setRoomId(null); })} className="cta-button secondary" disabled={processingAction !== null}>
+            {processingAction === 'leave' ? <span className="loading-spinner-small"></span> : 'Salir de la Sala'}
           </button>
 
           {!isCreator ? (
