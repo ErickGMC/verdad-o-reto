@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -25,7 +25,7 @@ let appInstance: FirebaseApp | null = null;
 if (isFirebaseConfigured) {
   try {
     appInstance = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    dbInstance = getFirestore(appInstance);
+    dbInstance = initializeFirestore(appInstance, { localCache: persistentLocalCache() });
   } catch (error) {
     console.error("Error initializing Firebase: ", error);
   }

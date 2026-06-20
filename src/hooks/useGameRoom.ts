@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { db, isFirebaseConfigured } from '../config/firebase';
-import { getQuestion } from '../data/questions';
+import { getQuestion, preloadQuestions } from '../data/questions';
 import {
   doc,
   setDoc,
   onSnapshot,
-  getDoc
+  getDoc,
+  runTransaction,
+  serverTimestamp
 } from 'firebase/firestore';
 
 export interface Player {
@@ -41,7 +43,7 @@ export interface TurnState {
 
 export interface Room {
   id: string;
-  createdAt: number;
+  createdAt: number | any; // Allows serverTimestamp()
   creatorId: string;
   status: 'LOBBY' | 'SELECTING' | 'WAITING_RESPONSE' | 'VOTING' | 'FINISHED';
   settings: RoomSettings;
@@ -60,11 +62,17 @@ export interface Room {
   };
 }
 
-// Generate a random 4-letter room code (e.g. "FR8A")
+export const SKILL_COSTS = {
+  skipTurn: 30,
+  changeQuestion: 20,
+  customTargetQuestion: 50
+};
+
+// Generate a random 6-letter room code
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
@@ -119,6 +127,9 @@ export function useGameRoom(roomId: string | null) {
     setError(null);
 
     if (isFirebaseConfigured && db) {
+      // Preload questions once (no onSnapshot listener to save reads)
+      preloadQuestions(db);
+
       // Firebase Mode: Listen to Firestore document updates
       const docRef = doc(db, 'rooms', roomId);
       const unsubscribe = onSnapshot(docRef, 
@@ -187,29 +198,45 @@ export function useGameRoom(roomId: string | null) {
     }
   }, [roomId]);
 
-  // --- STATE MUTATOR WRAPPER ---
-  // Helper to commit changes to either Firestore or BroadcastChannel + LocalStorage
-  const updateRoomState = async (updatedRoom: Room) => {
+  // --- ATOMIC STATE MUTATOR ---
+  // Helper to safely mutate the room state via transactions to avoid race conditions 
+  // when millions of players are playing concurrently.
+  const mutateRoomState = async (updater: (currentRoom: Room) => Room | null) => {
+    if (!roomId) return;
+    
     if (isFirebaseConfigured && db) {
-      const docRef = doc(db, 'rooms', updatedRoom.id);
-      await setDoc(docRef, updatedRoom);
+      const docRef = doc(db, 'rooms', roomId);
+      await runTransaction(db, async (transaction) => {
+        const sfDoc = await transaction.get(docRef);
+        if (!sfDoc.exists()) throw new Error("La sala no existe.");
+        
+        const currentRoom = sfDoc.data() as Room;
+        const newRoom = updater(currentRoom);
+        if (newRoom) {
+          transaction.set(docRef, newRoom);
+        }
+      });
     } else {
-      // Save locally
+      // Save locally (simulating atomic update by locking to synchronous execution)
       const savedRooms = localStorage.getItem('vor_mock_rooms');
       const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
-      roomsMap[updatedRoom.id] = updatedRoom;
-      localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
+      const currentRoom = roomsMap[roomId];
+      if (!currentRoom) throw new Error("La sala no existe localmente.");
+      
+      const newRoom = updater(currentRoom);
+      if (newRoom) {
+        roomsMap[newRoom.id] = newRoom;
+        localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
+        setRoom(newRoom);
 
-      // Update state locally
-      setRoom(updatedRoom);
-
-      // Broadcast to other tabs
-      if (mockChannel) {
-        mockChannel.postMessage({
-          type: 'UPDATE',
-          roomId: updatedRoom.id,
-          room: updatedRoom
-        });
+        // Broadcast to other tabs
+        if (mockChannel) {
+          mockChannel.postMessage({
+            type: 'UPDATE',
+            roomId: newRoom.id,
+            room: newRoom
+          });
+        }
       }
     }
   };
@@ -218,12 +245,32 @@ export function useGameRoom(roomId: string | null) {
 
   // 1. Create a Game Room
   const createRoom = async (creatorName: string, settings: RoomSettings, avatar: string) => {
-    const code = generateRoomCode();
     savePlayerName(creatorName);
+
+    let code = '';
+    let isUnique = false;
+    
+    // Collision checker loop for scaling to millions
+    while (!isUnique) {
+      code = generateRoomCode();
+      if (isFirebaseConfigured && db) {
+        const docRef = doc(db, 'rooms', code);
+        const snapshot = await getDoc(docRef);
+        if (!snapshot.exists()) {
+          isUnique = true;
+        }
+      } else {
+        const savedRooms = localStorage.getItem('vor_mock_rooms');
+        const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
+        if (!roomsMap[code]) {
+          isUnique = true;
+        }
+      }
+    }
 
     const newRoom: Room = {
       id: code,
-      createdAt: Date.now(),
+      createdAt: isFirebaseConfigured ? serverTimestamp() : Date.now(),
       creatorId: playerId,
       status: 'LOBBY',
       settings,
@@ -244,7 +291,16 @@ export function useGameRoom(roomId: string | null) {
       customQueuedQuestions: {}
     };
 
-    await updateRoomState(newRoom);
+    if (isFirebaseConfigured && db) {
+      const docRef = doc(db, 'rooms', code);
+      await setDoc(docRef, newRoom);
+    } else {
+      const savedRooms = localStorage.getItem('vor_mock_rooms');
+      const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
+      roomsMap[code] = newRoom;
+      localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
+    }
+    
     return code;
   };
 
@@ -276,268 +332,222 @@ export function useGameRoom(roomId: string | null) {
       throw new Error('La sala no existe o el código es incorrecto.');
     }
 
-    const updatedPlayers = {
-      ...fetchedRoom.players,
-      [playerId]: {
-        id: playerId,
-        name,
-        score: fetchedRoom.players[playerId]?.score || 0,
-        skills: fetchedRoom.players[playerId]?.skills || [],
-        isReady: playerId === fetchedRoom.creatorId, // creator ready, others false
-        isPresent: true,
-        avatar
-      }
-    };
-
-    const updatedOrder = fetchedRoom.playerOrder.includes(playerId)
-      ? fetchedRoom.playerOrder
-      : [...fetchedRoom.playerOrder, playerId];
-
-    const updatedRoom: Room = {
-      ...fetchedRoom,
-      players: updatedPlayers,
-      playerOrder: updatedOrder
-    };
-
-    await updateRoomState(updatedRoom);
+    if (isFirebaseConfigured && db) {
+       const docRef = doc(db, 'rooms', cleanedId);
+       await runTransaction(db, async (transaction) => {
+         const sfDoc = await transaction.get(docRef);
+         if (!sfDoc.exists()) throw new Error("La sala no existe.");
+         const r = sfDoc.data() as Room;
+         
+         const updatedPlayers = {
+            ...r.players,
+            [playerId]: {
+              id: playerId,
+              name,
+              score: r.players[playerId]?.score || 0,
+              skills: r.players[playerId]?.skills || [],
+              isReady: playerId === r.creatorId,
+              isPresent: true,
+              avatar
+            }
+          };
+          const updatedOrder = r.playerOrder.includes(playerId)
+            ? r.playerOrder
+            : [...r.playerOrder, playerId];
+          
+          transaction.set(docRef, {
+             ...r,
+             players: updatedPlayers,
+             playerOrder: updatedOrder
+          });
+       });
+    } else {
+      const savedRooms = localStorage.getItem('vor_mock_rooms');
+      const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
+      const r = roomsMap[cleanedId];
+      const updatedPlayers = {
+        ...r.players,
+        [playerId]: {
+          id: playerId,
+          name,
+          score: r.players[playerId]?.score || 0,
+          skills: r.players[playerId]?.skills || [],
+          isReady: playerId === r.creatorId,
+          isPresent: true,
+          avatar
+        }
+      };
+      const updatedOrder = r.playerOrder.includes(playerId)
+        ? r.playerOrder
+        : [...r.playerOrder, playerId];
+      
+      const updatedRoom = {
+         ...r,
+         players: updatedPlayers,
+         playerOrder: updatedOrder
+      };
+      roomsMap[cleanedId] = updatedRoom;
+      localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
+    }
+    
     return cleanedId;
   };
 
   // 3. Toggle Player Ready State
   const toggleReady = async () => {
-    if (!room) return;
-
-    const currentReady = room.players[playerId]?.isReady || false;
-    const updatedRoom: Room = {
-      ...room,
-      players: {
-        ...room.players,
-        [playerId]: {
-          ...room.players[playerId],
-          isReady: !currentReady
+    await mutateRoomState((current) => {
+      const currentReady = current.players[playerId]?.isReady || false;
+      return {
+        ...current,
+        players: {
+          ...current.players,
+          [playerId]: {
+            ...current.players[playerId],
+            isReady: !currentReady
+          }
         }
-      }
-    };
-
-    await updateRoomState(updatedRoom);
+      };
+    });
   };
 
   // 4. Start the Game (only creator)
   const startGame = async () => {
-    if (!room || playerId !== room.creatorId) return;
-
-    // Shuffle turn order randomly
-    const shuffledOrder = [...room.playerOrder].sort(() => Math.random() - 0.5);
-
-    const updatedRoom: Room = {
-      ...room,
-      status: 'SELECTING',
-      playerOrder: shuffledOrder,
-      currentTurnIdx: 0,
-      currentTurn: {
-        activePlayerId: shuffledOrder[0],
-        typeSelected: null,
-        content: '',
-        votes: {},
-        startedAt: Date.now()
-      }
-    };
-
-    await updateRoomState(updatedRoom);
+    await mutateRoomState((current) => {
+      if (playerId !== current.creatorId) return null;
+      
+      const shuffledOrder = [...current.playerOrder].sort(() => Math.random() - 0.5);
+      return {
+        ...current,
+        status: 'SELECTING',
+        playerOrder: shuffledOrder,
+        currentTurnIdx: 0,
+        currentTurn: {
+          activePlayerId: shuffledOrder[0],
+          typeSelected: null,
+          content: '',
+          votes: {},
+          startedAt: Date.now()
+        }
+      };
+    });
   };
 
   // 5. Select Truth or Dare category
   const selectCategory = async (type: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante') => {
-    if (!room || !room.currentTurn) return;
-    if (playerId !== room.currentTurn.activePlayerId) return; // verify active player
-
+    // Generate the question content beforehand to keep the transaction fast and sync
     let questionContent: string;
     let categoryType: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante' | 'custom' = type;
 
-    // Check if there is a custom question queued for this player
-    const queuedQuestion = room.customQueuedQuestions?.[playerId];
+    // We check locally first to see if custom
+    const queuedQuestion = room?.customQueuedQuestions?.[playerId];
     if (queuedQuestion) {
       questionContent = `[Pregunta Personalizada Anónima]: ${queuedQuestion.text}`;
       categoryType = 'custom';
     } else {
-      // Pull standard question from database
       const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
       questionContent = await getQuestion(db, action, level);
     }
 
-    // Clean custom question if used
-    const updatedQueued = { ...room.customQueuedQuestions };
-    delete updatedQueued[playerId];
-
-    const updatedRoom: Room = {
-      ...room,
-      status: 'WAITING_RESPONSE',
-      customQueuedQuestions: updatedQueued,
-      currentTurn: {
-        ...room.currentTurn,
-        typeSelected: categoryType,
-        content: questionContent,
-        startedAt: Date.now()
+    await mutateRoomState((current) => {
+      if (!current.currentTurn) return null;
+      if (playerId !== current.currentTurn.activePlayerId) return null;
+      
+      const updatedQueued = { ...current.customQueuedQuestions };
+      if (categoryType === 'custom') {
+         delete updatedQueued[playerId];
       }
-    };
 
-    await updateRoomState(updatedRoom);
+      return {
+        ...current,
+        status: 'WAITING_RESPONSE',
+        customQueuedQuestions: updatedQueued,
+        currentTurn: {
+          ...current.currentTurn,
+          typeSelected: categoryType,
+          content: questionContent,
+          startedAt: Date.now()
+        }
+      };
+    });
   };
 
   // 6. Active Player declares they responded or did the dare
   const submitResponse = async () => {
-    if (!room || !room.currentTurn) return;
-    if (playerId !== room.currentTurn.activePlayerId) return;
+    await mutateRoomState((current) => {
+      if (!current.currentTurn) return null;
+      if (playerId !== current.currentTurn.activePlayerId) return null;
 
-    const updatedRoom: Room = {
-      ...room,
-      status: 'VOTING',
-      currentTurn: {
-        ...room.currentTurn,
-        votes: {} // reset votes
-      }
-    };
-
-    await updateRoomState(updatedRoom);
+      return {
+        ...current,
+        status: 'VOTING',
+        currentTurn: {
+          ...current.currentTurn,
+          votes: {}
+        }
+      };
+    });
   };
 
   // 7. Players qualify the response (Success / Fail)
   const castVote = async (vote: 'COMPLIED' | 'FAILED') => {
-    if (!room || !room.currentTurn) return;
-    if (playerId === room.currentTurn.activePlayerId) return; // active player cannot vote
+    await mutateRoomState((current) => {
+      if (!current.currentTurn) return null;
+      if (playerId === current.currentTurn.activePlayerId) return null;
 
-    const updatedVotes = {
-      ...room.currentTurn.votes,
-      [playerId]: vote
-    };
+      const updatedVotes = {
+        ...current.currentTurn.votes,
+        [playerId]: vote
+      };
 
-    const updatedRoom: Room = {
-      ...room,
-      currentTurn: {
-        ...room.currentTurn,
-        votes: updatedVotes
-      }
-    };
-
-    await updateRoomState(updatedRoom);
+      return {
+        ...current,
+        currentTurn: {
+          ...current.currentTurn,
+          votes: updatedVotes
+        }
+      };
+    });
   };
 
   // 8. Move to the Next Turn (triggered after voting closes)
   const nextTurn = async () => {
-    if (!room || !room.currentTurn) return;
+    await mutateRoomState((current) => {
+      if (!current.currentTurn) return null;
 
-    // Calculate score earned in current turn
-    const activePlayerId = room.currentTurn.activePlayerId;
-    const activePlayer = room.players[activePlayerId];
-    
-    // Determine if turn succeeded (majority of positive votes)
-    const votesList = Object.values(room.currentTurn.votes);
-    const positiveVotes = votesList.filter(v => v === 'COMPLIED').length;
-    
-    // Voters are all players except the active player
-    const totalVoters = room.playerOrder.length - 1;
-    const isSuccess = positiveVotes > 0 && positiveVotes >= Math.ceil(totalVoters / 2);
-
-    let scoreAwarded = 0;
-    if (isSuccess && room.currentTurn.typeSelected) {
-      const type = room.currentTurn.typeSelected;
-      if (type.endsWith('leve')) {
-        scoreAwarded = 10;
-      } else if (type.endsWith('picante') || type === 'custom') {
-        scoreAwarded = 20;
-      }
-    }
-
-    // Update active player's score
-    const updatedPlayers = {
-      ...room.players,
-      [activePlayerId]: {
-        ...activePlayer,
-        score: activePlayer.score + scoreAwarded
-      }
-    };
-
-    // Calculate next turn index
-    const nextIdx = (room.currentTurnIdx + 1) % room.playerOrder.length;
-    const nextPlayerId = room.playerOrder[nextIdx];
-
-    const updatedRoom: Room = {
-      ...room,
-      status: 'SELECTING',
-      players: updatedPlayers,
-      currentTurnIdx: nextIdx,
-      currentTurn: {
-        activePlayerId: nextPlayerId,
-        typeSelected: null,
-        content: '',
-        votes: {},
-        startedAt: Date.now()
-      }
-    };
-
-    await updateRoomState(updatedRoom);
-  };
-
-  // 9. Buy a skill from the shop (Costs 50 pts)
-  const buySkill = async (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion') => {
-    if (!room) return;
-    const player = room.players[playerId];
-    if (!player || player.score < 50) return;
-
-    const updatedPlayers = {
-      ...room.players,
-      [playerId]: {
-        ...player,
-        score: player.score - 50,
-        skills: [...player.skills, skill]
-      }
-    };
-
-    const updatedRoom: Room = {
-      ...room,
-      players: updatedPlayers
-    };
-
-    await updateRoomState(updatedRoom);
-  };
-
-  // 10. Use a skill during turn
-  const triggerSkill = async (
-    skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion',
-    targetPlayerId?: string,
-    customText?: string
-  ) => {
-    if (!room || !room.currentTurn) return;
-
-    const player = room.players[playerId];
-    if (!player || !player.skills.includes(skill)) return;
-
-    // Remove the skill from the player's inventory
-    const skillIdx = player.skills.indexOf(skill);
-    const updatedSkills = [...player.skills];
-    updatedSkills.splice(skillIdx, 1);
-
-    const updatedPlayers = {
-      ...room.players,
-      [playerId]: {
-        ...player,
-        skills: updatedSkills
-      }
-    };
-
-    let updatedRoom: Room = {
-      ...room,
-      players: updatedPlayers
-    };
-
-    if (skill === 'skipTurn') {
-      // Instantly advance to the next player's turn
-      const nextIdx = (room.currentTurnIdx + 1) % room.playerOrder.length;
-      const nextPlayerId = room.playerOrder[nextIdx];
+      const activePlayerId = current.currentTurn.activePlayerId;
+      const activePlayer = current.players[activePlayerId];
       
-      updatedRoom = {
-        ...updatedRoom,
+      const votesList = Object.values(current.currentTurn.votes);
+      const positiveVotes = votesList.filter(v => v === 'COMPLIED').length;
+      
+      const totalVoters = current.playerOrder.length - 1;
+      const isSuccess = positiveVotes > 0 && positiveVotes >= Math.ceil(totalVoters / 2);
+
+      let scoreAwarded = 0;
+      if (isSuccess && current.currentTurn.typeSelected) {
+        const type = current.currentTurn.typeSelected;
+        if (type.endsWith('leve')) {
+          scoreAwarded = 10;
+        } else if (type.endsWith('picante') || type === 'custom') {
+          scoreAwarded = 20;
+        }
+      }
+
+      const updatedPlayers = {
+        ...current.players,
+        [activePlayerId]: {
+          ...activePlayer,
+          score: activePlayer.score + scoreAwarded
+        }
+      };
+
+      const nextIdx = (current.currentTurnIdx + 1) % current.playerOrder.length;
+      const nextPlayerId = current.playerOrder[nextIdx];
+
+      return {
+        ...current,
         status: 'SELECTING',
+        players: updatedPlayers,
         currentTurnIdx: nextIdx,
         currentTurn: {
           activePlayerId: nextPlayerId,
@@ -547,68 +557,142 @@ export function useGameRoom(roomId: string | null) {
           startedAt: Date.now()
         }
       };
-    } else if (skill === 'changeQuestion') {
-      // Reroll a new question of the same category
-      if (!room.currentTurn.typeSelected || room.currentTurn.typeSelected === 'custom') return;
-      
-      const type = room.currentTurn.typeSelected;
-      const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
-      const newQuestionContent = await getQuestion(db, action, level);
+    });
+  };
 
-      updatedRoom = {
-        ...updatedRoom,
-        currentTurn: {
-          ...room.currentTurn,
-          content: newQuestionContent,
-          votes: {},
-          startedAt: Date.now()
-        }
-      };
-    } else if (skill === 'customTargetQuestion' && targetPlayerId && customText) {
-      // Queue a custom question for the target player
-      const updatedQueued = {
-        ...room.customQueuedQuestions,
-        [targetPlayerId]: {
-          senderName: 'Anónimo',
-          text: customText
+  // 9. Buy a skill from the shop (Costs dynamically based on skill type)
+  const buySkill = async (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion') => {
+    await mutateRoomState((current) => {
+      const player = current.players[playerId];
+      const cost = SKILL_COSTS[skill];
+      if (!player || player.score < cost) return null;
+
+      const updatedPlayers = {
+        ...current.players,
+        [playerId]: {
+          ...player,
+          score: player.score - cost,
+          skills: [...player.skills, skill]
         }
       };
 
-      updatedRoom = {
-        ...updatedRoom,
-        customQueuedQuestions: updatedQueued
+      return {
+        ...current,
+        players: updatedPlayers
       };
+    });
+  };
+
+  // 10. Use a skill during turn
+  const triggerSkill = async (
+    skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion',
+    targetPlayerId?: string,
+    customText?: string
+  ) => {
+    // Generate new question beforehand to avoid doing it inside the transaction
+    let newQuestionContent = '';
+    if (skill === 'changeQuestion' && room?.currentTurn?.typeSelected && room.currentTurn.typeSelected !== 'custom') {
+       const type = room.currentTurn.typeSelected;
+       const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
+       newQuestionContent = await getQuestion(db, action, level);
     }
 
-    await updateRoomState(updatedRoom);
+    await mutateRoomState((current) => {
+      if (!current.currentTurn) return null;
+
+      const player = current.players[playerId];
+      if (!player || !player.skills.includes(skill)) return null;
+
+      const skillIdx = player.skills.indexOf(skill);
+      const updatedSkills = [...player.skills];
+      updatedSkills.splice(skillIdx, 1);
+
+      const updatedPlayers = {
+        ...current.players,
+        [playerId]: {
+          ...player,
+          skills: updatedSkills
+        }
+      };
+
+      let nextState: Room = {
+        ...current,
+        players: updatedPlayers
+      };
+
+      if (skill === 'skipTurn') {
+        const nextIdx = (current.currentTurnIdx + 1) % current.playerOrder.length;
+        const nextPlayerId = current.playerOrder[nextIdx];
+        
+        nextState = {
+          ...nextState,
+          status: 'SELECTING',
+          currentTurnIdx: nextIdx,
+          currentTurn: {
+            activePlayerId: nextPlayerId,
+            typeSelected: null,
+            content: '',
+            votes: {},
+            startedAt: Date.now()
+          }
+        };
+      } else if (skill === 'changeQuestion') {
+        if (!current.currentTurn.typeSelected || current.currentTurn.typeSelected === 'custom') return null;
+        
+        nextState = {
+          ...nextState,
+          currentTurn: {
+            ...current.currentTurn,
+            content: newQuestionContent,
+            votes: {},
+            startedAt: Date.now()
+          }
+        };
+      } else if (skill === 'customTargetQuestion' && targetPlayerId && customText) {
+        const updatedQueued = {
+          ...current.customQueuedQuestions,
+          [targetPlayerId]: {
+            senderName: 'Anónimo',
+            text: customText
+          }
+        };
+
+        nextState = {
+          ...nextState,
+          customQueuedQuestions: updatedQueued
+        };
+      }
+
+      return nextState;
+    });
   };
 
   // 11. Gift points to another player
   const giftPoints = async (toPlayerId: string, amount: number) => {
-    if (!room || !room.settings.allowGiftingPoints) return;
-    
-    const sender = room.players[playerId];
-    const receiver = room.players[toPlayerId];
-    if (!sender || !receiver || sender.score < amount || amount <= 0) return;
+    await mutateRoomState((current) => {
+      if (!current.settings.allowGiftingPoints) return null;
+      
+      const sender = current.players[playerId];
+      const receiver = current.players[toPlayerId];
+      if (!sender || !receiver || sender.score < amount || amount <= 0) return null;
 
-    const updatedPlayers = {
-      ...room.players,
-      [playerId]: {
-        ...sender,
-        score: sender.score - amount
-      },
-      [toPlayerId]: {
-        ...receiver,
-        score: receiver.score + amount
-      }
-    };
+      const updatedPlayers = {
+        ...current.players,
+        [playerId]: {
+          ...sender,
+          score: sender.score - amount
+        },
+        [toPlayerId]: {
+          ...receiver,
+          score: receiver.score + amount
+        }
+      };
 
-    const updatedRoom: Room = {
-      ...room,
-      players: updatedPlayers
-    };
-
-    await updateRoomState(updatedRoom);
+      return {
+        ...current,
+        players: updatedPlayers
+      };
+    });
   };
 
   return {

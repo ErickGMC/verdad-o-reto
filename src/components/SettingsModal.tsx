@@ -9,6 +9,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [timeLimit, setTimeLimit] = useState<number>(30); // default 30s
+  const [hasTimeLimit, setHasTimeLimit] = useState<boolean>(true);
   const [allowGifting, setAllowGifting] = useState<boolean>(true);
   const [skills, setSkills] = useState({
     skipTurn: true,
@@ -21,7 +22,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onConfirm({
-      turnTimeLimit: timeLimit,
+      turnTimeLimit: hasTimeLimit ? timeLimit : 0,
       allowGiftingPoints: allowGifting,
       enabledSkills: skills,
     });
@@ -38,19 +39,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         <form onSubmit={handleSubmit} className="settings-form">
           {/* Time limit selector */}
           <div className="form-group">
-            <label htmlFor="timeLimit">Tiempo por turno (segundos):</label>
-            <div className="time-selector-wrapper">
+            <label className="switch-label">
               <input
-                type="number"
-                id="timeLimit"
-                min="0"
-                max="300"
-                value={timeLimit}
-                onChange={(e) => setTimeLimit(Math.max(0, parseInt(e.target.value) || 0))}
-                className="number-input"
+                type="checkbox"
+                checked={hasTimeLimit}
+                onChange={(e) => setHasTimeLimit(e.target.checked)}
               />
-              <span className="helper-text">(0 para tiempo ilimitado)</span>
-            </div>
+              <span className="switch-text">Establecer límite de tiempo por turno</span>
+            </label>
+            {hasTimeLimit && (
+              <div className="time-selector-wrapper" style={{ marginTop: '8px', marginLeft: '28px' }}>
+                <input
+                  type="number"
+                  id="timeLimit"
+                  min="5"
+                  max="300"
+                  value={timeLimit}
+                  onChange={(e) => setTimeLimit(Math.max(5, parseInt(e.target.value) || 5))}
+                  className="number-input"
+                />
+                <span className="helper-text">segundos por turno</span>
+              </div>
+            )}
           </div>
 
           {/* Points gifting toggle */}
@@ -68,7 +78,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           {/* Enabled skills selection */}
           <div className="skills-settings-section">
             <h3>Habilidades Activas en la Tienda:</h3>
-            <p className="section-helper">Elige cuáles habilidades podrán comprar los jugadores por 50 puntos cada una.</p>
+            <p className="section-helper">Elige cuáles habilidades estarán disponibles para comprar en la tienda.</p>
             
             <div className="skills-toggles">
               <label className="switch-label">

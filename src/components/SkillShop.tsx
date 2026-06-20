@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { ShoppingBag, Star, Play, Send } from 'lucide-react';
+import { SKILL_COSTS } from '../hooks/useGameRoom';
 
 export const SkillShop: React.FC = () => {
   const { room, playerId, buySkill, triggerSkill } = useGame();
@@ -67,7 +68,8 @@ export const SkillShop: React.FC = () => {
       <div className="skills-buy-grid">
         {skillDetails.map((skill) => {
           if (!skill.enabled) return null;
-          const canBuy = me.score >= 50;
+          const cost = SKILL_COSTS[skill.id];
+          const canBuy = me.score >= cost;
 
           return (
             <div key={skill.id} className="shop-item">
@@ -81,7 +83,7 @@ export const SkillShop: React.FC = () => {
                 disabled={!canBuy}
                 className="cta-button primary buy-btn"
               >
-                Comprar (50 pts)
+                Comprar ({cost} pts)
               </button>
             </div>
           );

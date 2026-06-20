@@ -95,7 +95,7 @@ export const ALL_QUESTIONS: QuestionItem[] = [
   ...DARES_PICANTE.map((text, i) => ({ id: `dp_${i}`, text, type: 'dare' as const, level: 'picante' as const })),
 ];
 
-import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc, onSnapshot } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 
 export async function seedQuestionsIfEmpty(db: Firestore) {
@@ -119,6 +119,19 @@ export async function seedQuestionsIfEmpty(db: Firestore) {
 
 let cachedFirestoreQuestions: QuestionItem[] = [];
 
+export async function preloadQuestions(db: Firestore): Promise<void> {
+  if (cachedFirestoreQuestions.length > 0) return;
+
+  try {
+    await seedQuestionsIfEmpty(db);
+    const qCol = collection(db, 'questions');
+    const snapshot = await getDocs(qCol);
+    cachedFirestoreQuestions = snapshot.docs.map(doc => doc.data() as QuestionItem);
+  } catch (err) {
+    console.error("Error preloading questions:", err);
+  }
+}
+
 export async function getQuestion(
   db: Firestore | null,
   type: 'truth' | 'dare',
@@ -129,6 +142,7 @@ export async function getQuestion(
   }
 
   try {
+    // If real-time listener hasn't loaded data yet, load it once
     if (cachedFirestoreQuestions.length === 0) {
       await seedQuestionsIfEmpty(db);
       const qCol = collection(db, 'questions');
