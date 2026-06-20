@@ -460,6 +460,8 @@
   border-radius: 10px;
   font-size: 13px;
   line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .alert-info.warning {
@@ -649,6 +651,8 @@
   font-weight: 700;
   line-height: 1.5;
   color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .active-player-actions {
@@ -710,6 +714,8 @@
   font-weight: 600;
   font-style: italic;
   color: var(--text-secondary);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .voting-booth {

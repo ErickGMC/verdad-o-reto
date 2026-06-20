@@ -121,6 +121,13 @@ input, select, textarea {
   font-size: 14px;
   outline: none;
   transition: all 0.2s ease;
+  max-width: 100%;
+}
+
+textarea {
+  resize: vertical;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 input:focus, select:focus, textarea:focus {
