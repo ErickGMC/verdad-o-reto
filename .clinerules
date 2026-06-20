@@ -1,0 +1,36 @@
+# Rules for AI Coding Assistant
+
+You must write code, design architectures, and apply patterns using the most modern, efficient, and professional standards.
+
+## 1. Tech Stack Standards
+
+### React (19.x+)
+- **Functional Components**: Use arrow functions (`const Component = () => ...`) with strict TypeScript prop typing.
+- **Hooks & State**:
+  - Prefer React 19 native behaviors.
+  - Keep state local and lift up only when necessary.
+  - Avoid sync state anti-patterns (e.g., updating state inside `useEffect` because of prop changes; calculate values directly during render).
+  - Always return a cleanup function in `useEffect` when setting timers, event listeners, or subscriptions to avoid memory leaks.
+  - Use custom hooks to decouple business logic, state management, and side effects from the UI representation.
+- **Performance**:
+  - Let React Compiler handle standard optimizations. Do not overuse `useMemo`/`useCallback` unless passing to optimized children or dependency arrays.
+  - Avoid inline objects or functions in dependency arrays to prevent unnecessary effect cycles.
+
+### TypeScript (6.x+)
+- **Strict Typing**: Set `"strict": true` and avoid `any`. Use `unknown` or `never` where appropriate.
+- **Type Definitions**: Prefer `interface` for component props and object models (supporting declaration merging), and `type` for unions, intersections, and utility types.
+- **Modern Syntax**: Utilize optional chaining (`?.`), nullish coalescing (`??`), and utility types (`Omit`, `Pick`, `Partial`, `Record`).
+
+### Styling (CSS)
+- **Modern CSS**: Prioritize Vanilla CSS with CSS Custom Properties (variables), flexbox, grid, and modern functions like `clamp()`, `min()`, `max()`, and container queries.
+- **BEM/Modules**: Organize CSS logically. Keep layout styles separated from component/theme styles.
+
+## 2. Architecture & Design Patterns
+- **SOLID Principles**: Ensure each component has a Single Responsibility.
+- **Clean Architecture / Feature Folder Structure**: Group files by feature (e.g., `src/features/feature-name/{components,hooks,services}`) rather than general types.
+- **Declarative over Imperative**: Write code that declares *what* the UI should look like based on current state, rather than *how* to mutate the DOM.
+- **DRY (Don't Repeat Yourself) / WET (Write Everything Twice)**: Abstract logic only after seeing a pattern repeated 2-3 times. Avoid premature abstractions.
+
+## 3. Quality & Security
+- **Error Handling**: Use React Error Boundaries. Always catch asynchronous failures and update UI state appropriately (loading/error views).
+- **No Placeholders**: Never write placeholders. Provide fully working code with proper mock data if real data is unavailable.
