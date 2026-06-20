@@ -17,6 +17,17 @@ export const GameBoard: React.FC = () => {
   const [giftTargetId, setGiftTargetId] = useState<string>('');
   const [giftAmount, setGiftAmount] = useState<number>(10);
   const [showGiftForm, setShowGiftForm] = useState<boolean>(false);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
+    if (processingAction) return;
+    setProcessingAction(actionId);
+    try {
+      await actionFn();
+    } finally {
+      setProcessingAction(null);
+    }
+  };
 
   const isMyTurn = room?.currentTurn?.activePlayerId === playerId;
   const status = room?.status;
@@ -66,8 +77,9 @@ export const GameBoard: React.FC = () => {
   const handleGiftPoints = (e: React.FormEvent) => {
     e.preventDefault();
     if (!giftTargetId || giftAmount <= 0) return;
-    giftPoints(giftTargetId, giftAmount);
-    setShowGiftForm(false);
+    handleAction('gift', () => giftPoints(giftTargetId, giftAmount)).then(() => {
+      setShowGiftForm(false);
+    });
   };
 
   return (
@@ -104,37 +116,38 @@ export const GameBoard: React.FC = () => {
                   <div className="custom-question-alert alert-info warning">
                     <span>⚠️ Tienes una pregunta personalizada pendiente hecha por un compañero.</span>
                     <button 
-                      onClick={() => selectCategory('truth_leve')} // triggers category select, reads custom question
+                      onClick={() => handleAction('truth_leve', () => selectCategory('truth_leve'))}
+                      disabled={processingAction !== null}
                       className="cta-button primary"
                       style={{ marginTop: '12px' }}
                     >
-                      Revelar Mi Reto Personalizado 🎯
+                      {processingAction === 'truth_leve' ? <span className="loading-spinner-small"></span> : 'Revelar Mi Reto Personalizado 🎯'}
                     </button>
                   </div>
                 ) : (
                   <>
                     <h3>¡Elige tu destino!</h3>
                     <div className="picker-grid">
-                      <button onClick={() => selectCategory('truth_leve')} className="pick-card truth leve">
-                        <span className="pick-emoji">😇</span>
+                      <button onClick={() => handleAction('truth_leve', () => selectCategory('truth_leve'))} disabled={processingAction !== null} className="pick-card truth leve">
+                        <span className="pick-emoji">{processingAction === 'truth_leve' ? <span className="loading-spinner-small"></span> : '😇'}</span>
                         <h4>Verdad Leve</h4>
                         <span className="points-badge">+10 pts</span>
                       </button>
 
-                      <button onClick={() => selectCategory('truth_picante')} className="pick-card truth picante">
-                        <span className="pick-emoji">😈</span>
+                      <button onClick={() => handleAction('truth_picante', () => selectCategory('truth_picante'))} disabled={processingAction !== null} className="pick-card truth picante">
+                        <span className="pick-emoji">{processingAction === 'truth_picante' ? <span className="loading-spinner-small"></span> : '😈'}</span>
                         <h4>Verdad Picante</h4>
                         <span className="points-badge">+20 pts</span>
                       </button>
 
-                      <button onClick={() => selectCategory('dare_leve')} className="pick-card dare leve">
-                        <span className="pick-emoji">🤪</span>
+                      <button onClick={() => handleAction('dare_leve', () => selectCategory('dare_leve'))} disabled={processingAction !== null} className="pick-card dare leve">
+                        <span className="pick-emoji">{processingAction === 'dare_leve' ? <span className="loading-spinner-small"></span> : '🤪'}</span>
                         <h4>Reto Leve</h4>
                         <span className="points-badge">+10 pts</span>
                       </button>
 
-                      <button onClick={() => selectCategory('dare_picante')} className="pick-card dare picante">
-                        <span className="pick-emoji">🔥</span>
+                      <button onClick={() => handleAction('dare_picante', () => selectCategory('dare_picante'))} disabled={processingAction !== null} className="pick-card dare picante">
+                        <span className="pick-emoji">{processingAction === 'dare_picante' ? <span className="loading-spinner-small"></span> : '🔥'}</span>
                         <h4>Reto Picante</h4>
                         <span className="points-badge">+20 pts</span>
                       </button>
@@ -166,8 +179,8 @@ export const GameBoard: React.FC = () => {
             {isMyTurn ? (
               <div className="active-player-actions">
                 <p className="instruction">Lee la pregunta/reto en voz alta y realízalo. Luego presiona el botón.</p>
-                <button onClick={submitResponse} className="cta-button primary action-btn">
-                  ¡Listo, califíquenme! 👍
+                <button onClick={() => handleAction('submit_response', submitResponse)} disabled={processingAction !== null} className="cta-button primary action-btn">
+                  {processingAction === 'submit_response' ? <span className="loading-spinner-small"></span> : '¡Listo, califíquenme! 👍'}
                 </button>
               </div>
             ) : (
@@ -192,11 +205,11 @@ export const GameBoard: React.FC = () => {
               <div className="voting-booth">
                 <p className="instruction">¿Consideras que completó el reto o respondió con la verdad?</p>
                 <div className="vote-buttons">
-                  <button onClick={() => castVote('COMPLIED')} className="vote-btn success">
-                    <Check size={20} /> Cumplió
+                  <button onClick={() => handleAction('vote_success', () => castVote('COMPLIED'))} disabled={processingAction !== null} className="vote-btn success">
+                    {processingAction === 'vote_success' ? <span className="loading-spinner-small"></span> : <><Check size={20} /> Cumplió</>}
                   </button>
-                  <button onClick={() => castVote('FAILED')} className="vote-btn danger">
-                    <X size={20} /> Falló
+                  <button onClick={() => handleAction('vote_fail', () => castVote('FAILED'))} disabled={processingAction !== null} className="vote-btn danger">
+                    {processingAction === 'vote_fail' ? <span className="loading-spinner-small"></span> : <><X size={20} /> Falló</>}
                   </button>
                 </div>
               </div>
@@ -240,8 +253,8 @@ export const GameBoard: React.FC = () => {
                 </p>
 
                 {(isMyTurn || playerId === room.creatorId) && (
-                  <button onClick={nextTurn} className="cta-button primary next-turn-btn">
-                    Continuar al Siguiente Turno ➡️
+                  <button onClick={() => handleAction('next_turn', nextTurn)} disabled={processingAction !== null} className="cta-button primary next-turn-btn">
+                    {processingAction === 'next_turn' ? <span className="loading-spinner-small"></span> : 'Continuar al Siguiente Turno ➡️'}
                   </button>
                 )}
               </div>
@@ -313,8 +326,8 @@ export const GameBoard: React.FC = () => {
                     onChange={(e) => setGiftAmount(Math.min(me.score, Math.max(1, parseInt(e.target.value) || 0)))}
                     required
                   />
-                  <button type="submit" disabled={!giftTargetId || me.score < giftAmount} className="cta-button primary send-btn">
-                    Enviar
+                  <button type="submit" disabled={!giftTargetId || me.score < giftAmount || processingAction !== null} className="cta-button primary send-btn">
+                    {processingAction === 'gift' ? <span className="loading-spinner-small"></span> : 'Enviar'}
                   </button>
                 </div>
                 <button type="button" onClick={() => setShowGiftForm(false)} className="cta-button link-btn">

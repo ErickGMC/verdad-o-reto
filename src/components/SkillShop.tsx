@@ -8,6 +8,17 @@ export const SkillShop: React.FC = () => {
   const [customTargetId, setCustomTargetId] = useState<string>('');
   const [customText, setCustomText] = useState<string>('');
   const [showCustomForm, setShowCustomForm] = useState(false);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
+    if (processingAction) return;
+    setProcessingAction(actionId);
+    try {
+      await actionFn();
+    } finally {
+      setProcessingAction(null);
+    }
+  };
 
   if (!room) return null;
 
@@ -45,10 +56,11 @@ export const SkillShop: React.FC = () => {
     e.preventDefault();
     if (!customTargetId || !customText.trim()) return;
 
-    triggerSkill('customTargetQuestion', customTargetId, customText.trim());
-    setCustomText('');
-    setCustomTargetId('');
-    setShowCustomForm(false);
+    handleAction('custom_target', () => triggerSkill('customTargetQuestion', customTargetId, customText.trim())).then(() => {
+      setCustomText('');
+      setCustomTargetId('');
+      setShowCustomForm(false);
+    });
   };
 
   return (
@@ -79,11 +91,11 @@ export const SkillShop: React.FC = () => {
                 <p>{skill.desc}</p>
               </div>
               <button
-                onClick={() => buySkill(skill.id)}
-                disabled={!canBuy}
+                onClick={() => handleAction(`buy_${skill.id}`, () => buySkill(skill.id))}
+                disabled={!canBuy || processingAction !== null}
                 className="cta-button primary buy-btn"
               >
-                Comprar ({cost} pts)
+                {processingAction === `buy_${skill.id}` ? <span className="loading-spinner-small"></span> : `Comprar (${cost} pts)`}
               </button>
             </div>
           );
@@ -119,11 +131,11 @@ export const SkillShop: React.FC = () => {
                   
                   {skillId !== 'customTargetQuestion' ? (
                     <button
-                      onClick={() => triggerSkill(skillId)}
-                      disabled={!isUsable}
+                      onClick={() => handleAction(`use_${skillId}`, () => triggerSkill(skillId))}
+                      disabled={!isUsable || processingAction !== null}
                       className="cta-button primary use-btn"
                     >
-                      <Play size={12} /> Usar
+                      {processingAction === `use_${skillId}` ? <span className="loading-spinner-small"></span> : <><Play size={12} /> Usar</>}
                     </button>
                   ) : (
                     <button
@@ -186,8 +198,8 @@ export const SkillShop: React.FC = () => {
                 <button type="button" className="cta-button secondary" onClick={() => setShowCustomForm(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className="cta-button primary" disabled={!customTargetId || !customText.trim()}>
-                  <Send size={14} /> Enviar al Jugador
+                <button type="submit" className="cta-button primary" disabled={!customTargetId || !customText.trim() || processingAction !== null}>
+                  {processingAction === 'custom_target' ? <span className="loading-spinner-small"></span> : <><Send size={14} /> Enviar al Jugador</>}
                 </button>
               </div>
             </form>

@@ -1387,3 +1387,13 @@
 .cta-button.link-btn:hover {
   color: var(--text-primary) !important;
 }
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}

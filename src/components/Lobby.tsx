@@ -6,6 +6,17 @@ export const Lobby: React.FC = () => {
   const { room, playerId, toggleReady, startGame, setRoomId } = useGame();
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
+    if (processingAction) return;
+    setProcessingAction(actionId);
+    try {
+      await actionFn();
+    } finally {
+      setProcessingAction(null);
+    }
+  };
 
   if (!room) return null;
 
@@ -122,24 +133,25 @@ export const Lobby: React.FC = () => {
 
         {/* Actions buttons */}
         <div className="lobby-actions">
-          <button onClick={() => setRoomId(null)} className="cta-button secondary">
+          <button onClick={() => setRoomId(null)} className="cta-button secondary" disabled={processingAction !== null}>
             Salir de la Sala
           </button>
 
           {!isCreator ? (
             <button 
-              onClick={toggleReady} 
+              onClick={() => handleAction('ready', toggleReady)} 
+              disabled={processingAction !== null}
               className={`cta-button ${me?.isReady ? 'secondary' : 'primary'}`}
             >
-              {me?.isReady ? 'Quitar Listo' : 'Marcar Listo'}
+              {processingAction === 'ready' ? <span className="loading-spinner-small"></span> : (me?.isReady ? 'Quitar Listo' : 'Marcar Listo')}
             </button>
           ) : (
             <button 
-              onClick={startGame} 
-              disabled={!canStart} 
+              onClick={() => handleAction('start', startGame)} 
+              disabled={!canStart || processingAction !== null} 
               className="cta-button primary"
             >
-              Iniciar Partida 🚀
+              {processingAction === 'start' ? <span className="loading-spinner-small"></span> : 'Iniciar Partida 🚀'}
             </button>
           )}
         </div>
