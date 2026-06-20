@@ -1311,6 +1311,30 @@
   .picker-grid {
     grid-template-columns: 1fr;
   }
+
+  .shop-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .item-emoji {
+    margin: 0 auto;
+  }
+  
+  .buy-btn {
+    width: 100%;
+  }
+
+  .inventory-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .use-btn {
+    width: 100%;
+  }
 }
 
 /* --- BUTTONS SYSTEM --- */
