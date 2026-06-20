@@ -95,7 +95,7 @@ export const ALL_QUESTIONS: QuestionItem[] = [
   ...DARES_PICANTE.map((text, i) => ({ id: `dp_${i}`, text, type: 'dare' as const, level: 'picante' as const })),
 ];
 
-import { collection, getDocs, writeBatch, doc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 
 export async function seedQuestionsIfEmpty(db: Firestore) {
