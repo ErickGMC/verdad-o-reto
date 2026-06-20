@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db, isFirebaseConfigured } from '../config/firebase';
-import { getRandomItem } from '../data/questions';
+import { getQuestion } from '../data/questions';
 import {
   doc,
   setDoc,
@@ -270,6 +270,9 @@ export function useGameRoom(roomId: string | null) {
     }
 
     if (!fetchedRoom) {
+      if (!isFirebaseConfigured) {
+        throw new Error('La sala no existe. En Modo Demo Local, asegúrate de estar usando el mismo navegador (pestañas normales, no incógnito) ya que las salas locales se guardan en el LocalStorage y no se comparten entre navegadores o dispositivos.');
+      }
       throw new Error('La sala no existe o el código es incorrecto.');
     }
 
@@ -359,7 +362,7 @@ export function useGameRoom(roomId: string | null) {
     } else {
       // Pull standard question from database
       const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
-      questionContent = getRandomItem(action, level);
+      questionContent = await getQuestion(db, action, level);
     }
 
     // Clean custom question if used
@@ -550,7 +553,7 @@ export function useGameRoom(roomId: string | null) {
       
       const type = room.currentTurn.typeSelected;
       const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
-      const newQuestionContent = getRandomItem(action, level);
+      const newQuestionContent = await getQuestion(db, action, level);
 
       updatedRoom = {
         ...updatedRoom,

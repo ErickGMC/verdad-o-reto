@@ -86,3 +86,67 @@ export function getRandomItem(type: 'truth' | 'dare', level: 'leve' | 'picante')
     return list[Math.floor(Math.random() * list.length)];
   }
 }
+
+// Complete list of all items for seeding database
+export const ALL_QUESTIONS: QuestionItem[] = [
+  ...TRUTHS_LEVE.map((text, i) => ({ id: `tl_${i}`, text, type: 'truth' as const, level: 'leve' as const })),
+  ...TRUTHS_PICANTE.map((text, i) => ({ id: `tp_${i}`, text, type: 'truth' as const, level: 'picante' as const })),
+  ...DARES_LEVE.map((text, i) => ({ id: `dl_${i}`, text, type: 'dare' as const, level: 'leve' as const })),
+  ...DARES_PICANTE.map((text, i) => ({ id: `dp_${i}`, text, type: 'dare' as const, level: 'picante' as const })),
+];
+
+import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
+
+export async function seedQuestionsIfEmpty(db: Firestore) {
+  try {
+    const qCol = collection(db, 'questions');
+    const snapshot = await getDocs(qCol);
+    if (snapshot.empty) {
+      console.log('Seeding questions in Firestore...');
+      const batch = writeBatch(db);
+      ALL_QUESTIONS.forEach((q) => {
+        const docRef = doc(db, 'questions', q.id);
+        batch.set(docRef, q);
+      });
+      await batch.commit();
+      console.log('Seeding complete.');
+    }
+  } catch (error) {
+    console.error('Error seeding questions:', error);
+  }
+}
+
+let cachedFirestoreQuestions: QuestionItem[] = [];
+
+export async function getQuestion(
+  db: Firestore | null,
+  type: 'truth' | 'dare',
+  level: 'leve' | 'picante'
+): Promise<string> {
+  if (!db) {
+    return getRandomItem(type, level);
+  }
+
+  try {
+    if (cachedFirestoreQuestions.length === 0) {
+      await seedQuestionsIfEmpty(db);
+      const qCol = collection(db, 'questions');
+      const snapshot = await getDocs(qCol);
+      cachedFirestoreQuestions = snapshot.docs.map(doc => doc.data() as QuestionItem);
+    }
+
+    const filtered = cachedFirestoreQuestions.filter(
+      q => q.type === type && q.level === level
+    );
+
+    if (filtered.length > 0) {
+      return filtered[Math.floor(Math.random() * filtered.length)].text;
+    }
+  } catch (err) {
+    console.error('Error loading questions from Firestore:', err);
+  }
+
+  return getRandomItem(type, level);
+}
+
