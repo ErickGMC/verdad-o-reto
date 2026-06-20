@@ -357,7 +357,7 @@ export function useGameRoom(roomId: string | null) {
     // Check if there is a custom question queued for this player
     const queuedQuestion = room.customQueuedQuestions?.[playerId];
     if (queuedQuestion) {
-      questionContent = `[Pregunta Personalizada de ${queuedQuestion.senderName}]: ${queuedQuestion.text}`;
+      questionContent = `[Pregunta Personalizada Anónima]: ${queuedQuestion.text}`;
       categoryType = 'custom';
     } else {
       // Pull standard question from database
@@ -569,7 +569,7 @@ export function useGameRoom(roomId: string | null) {
       const updatedQueued = {
         ...room.customQueuedQuestions,
         [targetPlayerId]: {
-          senderName: player.name,
+          senderName: 'Anónimo',
           text: customText
         }
       };

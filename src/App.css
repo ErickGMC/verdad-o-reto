@@ -1306,3 +1306,84 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* --- BUTTONS SYSTEM --- */
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.1px;
+  user-select: none;
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.cta-button.primary {
+  background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(168, 85, 247, 0.4);
+}
+
+.cta-button.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(168, 85, 247, 0.6), 0 0 0 2px rgba(236, 72, 153, 0.2);
+  filter: brightness(1.1);
+}
+
+.cta-button.primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px 0 rgba(168, 85, 247, 0.4);
+}
+
+.cta-button.secondary {
+  background-color: rgba(27, 31, 53, 0.6);
+  border: 1.5px solid var(--border-color);
+  color: var(--text-primary);
+  backdrop-filter: var(--glass-blur);
+}
+
+.cta-button.secondary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background-color: rgba(38, 44, 74, 0.8);
+  border-color: var(--neon-purple);
+  color: #ffffff;
+  box-shadow: 0 4px 12px 0 rgba(168, 85, 247, 0.15);
+}
+
+.cta-button.secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.cta-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-tertiary) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Link Button fallback overrides */
+.cta-button.link-btn {
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-secondary) !important;
+  text-decoration: underline;
+  padding: 4px 8px !important;
+  font-weight: 500;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.cta-button.link-btn:hover {
+  color: var(--text-primary) !important;
+}
