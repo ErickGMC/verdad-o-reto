@@ -27,6 +27,7 @@ function GameContent() {
   const [joinCode, setJoinCode] = useState<string>('');
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [joinMode, setJoinMode] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Check URL search parameters for automatic invite code redirection
   useEffect(() => {
@@ -43,18 +44,22 @@ function GameContent() {
 
   const handleCreateRoom = async (settings: RoomSettings) => {
     if (!name.trim()) return;
+    setIsProcessing(true);
     try {
       await createRoom(name.trim(), settings, selectedAvatar);
       setShowSettings(false);
     } catch (err) {
       const errorVal = err as Error;
       alert(errorVal.message || 'Error al crear la sala');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleJoinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !joinCode.trim()) return;
+    setIsProcessing(true);
     try {
       await joinRoom(joinCode.trim(), name.trim(), selectedAvatar);
       // Clean up URL if it has query params
@@ -64,6 +69,8 @@ function GameContent() {
     } catch (err) {
       const errorVal = err as Error;
       alert(errorVal.message || 'Error al unirse a la sala');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -74,11 +81,11 @@ function GameContent() {
   };
 
   // --- LOADING / STATUS SCREEN ---
-  if (loading) {
+  if (loading || isProcessing) {
     return (
       <div className="starter-canvas">
         <div className="loading-spinner"></div>
-        <p className="loading-text">Sincronizando estado del juego...</p>
+        <p className="loading-text">{isProcessing ? 'Conectando con el servidor...' : 'Sincronizando estado del juego...'}</p>
       </div>
     );
   }
@@ -219,8 +226,8 @@ function GameContent() {
                 <input
                   type="text"
                   id="roomCode"
-                  placeholder="Ej: FR8A"
-                  maxLength={4}
+                  placeholder="Ej: FR8A7X"
+                  maxLength={6}
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   required
@@ -228,7 +235,7 @@ function GameContent() {
               </div>
               
               <div className="welcome-actions">
-                <button type="submit" className="cta-button primary" disabled={!name.trim() || joinCode.length < 4}>
+                <button type="submit" className="cta-button primary" disabled={!name.trim() || joinCode.length < 6 || isProcessing}>
                   Unirse a la Partida
                 </button>
                 <button
