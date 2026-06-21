@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, Heart, Coffee, Smartphone } from 'lucide-react';
+import { Info, Heart, Coffee } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -26,10 +26,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             <p className="author-role">Desarrollador Web</p>
             
             <div className="contact-methods" style={{ marginTop: '12px' }}>
-              <div className="contact-item" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Smartphone size={16} />
-                <span>997346193</span>
-              </div>
               <div className="contact-item" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
                 <span style={{ fontSize: '18px' }}>✉️</span>
                 <a href="mailto:erickmartinezc@gmail.com" style={{ color: 'var(--neon-blue)', textDecoration: 'none' }}>erickmartinezc@gmail.com</a>
@@ -40,15 +36,15 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               ¡Acepto con gusto cualquier sugerencia, crítica constructiva o ideas de nuevas funciones que te gustaría ver en el juego! Escríbeme y hagamos que este juego sea aún mejor.
             </p>
 
-            <div className="support-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px', display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <div className="qr-container" style={{ background: '#fff', padding: '6px', borderRadius: '12px', display: 'inline-block' }}>
-                <img src="/yape-qr.png" alt="Yape QR" style={{ width: '90px', height: '90px', display: 'block', borderRadius: '8px' }} />
+            <div className="support-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+              <div className="qr-container" style={{ background: '#fff', padding: '10px', borderRadius: '16px', display: 'inline-block' }}>
+                <img src="/yape-qr.png" alt="Yape QR" style={{ width: '150px', height: '150px', display: 'block', borderRadius: '8px' }} />
               </div>
-              <div>
+              <div style={{ flex: '1 1 200px' }}>
                 <p className="contact-note" style={{ margin: 0, color: 'var(--text-secondary)' }}>
                   Si te ha gustado, puedes invitarme un café <Coffee size={14} style={{ display: 'inline', marginLeft: '4px' }} />
                 </p>
-                <div className="payment-badges" style={{ marginTop: '8px' }}>
+                <div className="payment-badges" style={{ marginTop: '12px', justifyContent: 'center' }}>
                   <span className="payment-badge plin">Plin</span>
                 </div>
               </div>
