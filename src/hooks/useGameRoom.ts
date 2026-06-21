@@ -14,7 +14,7 @@ export interface Player {
   id: string;
   name: string;
   score: number;
-  skills: ('skipTurn' | 'changeQuestion' | 'customTargetQuestion')[];
+  skills: ('skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge')[];
   isReady: boolean;
   isPresent: boolean;
   avatar: string;
@@ -23,10 +23,12 @@ export interface Player {
 export interface RoomSettings {
   turnTimeLimit: number;       // in seconds, 0 = unlimited
   allowGiftingPoints: boolean;
+  showScores: boolean;
   enabledSkills: {
     skipTurn: boolean;
     changeQuestion: boolean;
     customTargetQuestion: boolean;
+    transferChallenge: boolean;
   };
 }
 
@@ -66,7 +68,8 @@ export interface Room {
 export const SKILL_COSTS = {
   skipTurn: 30,
   changeQuestion: 20,
-  customTargetQuestion: 50
+  customTargetQuestion: 50,
+  transferChallenge: 40
 };
 
 // Generate a random 6-letter room code
@@ -537,16 +540,16 @@ export function useGameRoom(roomId: string | null) {
       const positiveVotes = votesList.filter(v => v === 'COMPLIED').length;
       
       const totalVoters = current.playerOrder.length - 1;
-      const isSuccess = positiveVotes > 0 && positiveVotes >= Math.ceil(totalVoters / 2);
+      const isSuccess = positiveVotes > totalVoters / 2;
 
       let scoreAwarded = 0;
       if (isSuccess && current.currentTurn.typeSelected) {
         const type = current.currentTurn.typeSelected;
-        if (type.endsWith('leve')) {
-          scoreAwarded = 10;
-        } else if (type.endsWith('picante') || type === 'custom') {
-          scoreAwarded = 20;
-        }
+        if (type === 'truth_leve') scoreAwarded = 10;
+        else if (type === 'truth_picante') scoreAwarded = 20;
+        else if (type === 'dare_leve') scoreAwarded = 20;
+        else if (type === 'dare_picante') scoreAwarded = 30;
+        else if (type === 'custom') scoreAwarded = 20;
       }
 
       const updatedPlayers = {
@@ -577,7 +580,7 @@ export function useGameRoom(roomId: string | null) {
   };
 
   // 9. Buy a skill from the shop (Costs dynamically based on skill type)
-  const buySkill = async (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion') => {
+  const buySkill = async (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge') => {
     await mutateRoomState((current) => {
       const player = current.players[playerId];
       const cost = SKILL_COSTS[skill];
@@ -601,7 +604,7 @@ export function useGameRoom(roomId: string | null) {
 
   // 10. Use a skill during turn
   const triggerSkill = async (
-    skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion',
+    skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge',
     targetPlayerId?: string,
     customText?: string
   ) => {
@@ -676,6 +679,16 @@ export function useGameRoom(roomId: string | null) {
         nextState = {
           ...nextState,
           customQueuedQuestions: updatedQueued
+        };
+      } else if (skill === 'transferChallenge' && targetPlayerId) {
+        nextState = {
+          ...nextState,
+          currentTurn: {
+            ...current.currentTurn,
+            activePlayerId: targetPlayerId,
+            startedAt: Date.now(), // Restart timer for the new player
+            votes: {}
+          }
         };
       }
 
@@ -830,8 +843,46 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
+  // 15. Update Player Profile
+  const updatePlayerProfile = async (newName: string, newAvatar: string) => {
+    savePlayerName(newName);
+    await mutateRoomState((current) => {
+      const player = current.players[playerId];
+      if (!player) return null;
+
+      const updatedPlayers = {
+        ...current.players,
+        [playerId]: {
+          ...player,
+          name: newName,
+          avatar: newAvatar
+        }
+      };
+
+      return {
+        ...current,
+        players: updatedPlayers
+      };
+    });
+  };
+
+  // 16. Update Room Settings (Only Creator)
+  const updateRoomSettings = async (newSettings: RoomSettings, newPassword?: string) => {
+    await mutateRoomState((current) => {
+      if (current.creatorId !== playerId) return null;
+
+      return {
+        ...current,
+        settings: newSettings,
+        ...(newPassword !== undefined ? { password: newPassword } : {})
+      };
+    });
+  };
+
   return {
     room,
+    currentRoomId: room?.id || null,
+    setRoomId: () => {}, // Handled differently now, maybe need to add if missing or check GameContext
     playerId,
     playerName,
     loading,
@@ -851,5 +902,7 @@ export function useGameRoom(roomId: string | null) {
     leaveRoom,
     kickPlayer,
     transferCreator,
+    updatePlayerProfile,
+    updateRoomSettings,
   };
 }

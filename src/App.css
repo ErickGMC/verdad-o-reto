@@ -1478,3 +1478,135 @@
   box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
 }
 
+/* --- STARTER CONTAINER --- */
+.starter-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  width: 100%;
+}
+
+/* --- ABOUT MODAL --- */
+.about-modal .modal-header h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.about-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+.glass-panel {
+  background-color: rgba(9, 11, 17, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.about-author {
+  text-align: center;
+}
+
+.author-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--neon-purple);
+  margin-bottom: 4px;
+}
+
+.author-role {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.contact-methods {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.payment-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.payment-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.payment-badge.yape {
+  background-color: #6a1b9a; /* Yape purple */
+}
+
+.payment-badge.plin {
+  background-color: #00e5ff; /* Plin cyan */
+  color: #000;
+}
+
+.contact-note {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.about-philosophy {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background-color: rgba(236, 72, 153, 0.05);
+  border-color: rgba(236, 72, 153, 0.2);
+}
+
+.philosophy-icon {
+  flex-shrink: 0;
+  color: var(--neon-pink);
+}
+
+.pulse-heart {
+  animation: pulse-heart 2s infinite ease-in-out;
+}
+
+@keyframes pulse-heart {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px var(--neon-pink)); }
+  50% { transform: scale(1.15); filter: drop-shadow(0 0 10px var(--neon-pink)); }
+}
+
+.philosophy-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.neon-text-blue {
+  color: var(--neon-blue);
+  filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.5));
+}
+

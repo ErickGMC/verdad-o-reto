@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
-import { Copy, Share2, Crown, AlertCircle, UserMinus } from 'lucide-react';
+import { Copy, Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save } from 'lucide-react';
+import { SettingsModal } from './SettingsModal';
 
 export const Lobby: React.FC = () => {
-  const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom, kickPlayer, transferCreator } = useGame();
+  const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom, kickPlayer, transferCreator, updatePlayerProfile, updateRoomSettings } = useGame();
   const { showConfirm } = useAlert();
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
 
   const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
     if (processingAction) return;
@@ -25,6 +32,25 @@ export const Lobby: React.FC = () => {
   const playersList = Object.values(room.players);
   const me = room.players[playerId];
   const isCreator = room.creatorId === playerId;
+
+  const startEditingProfile = () => {
+    if (me) {
+      setEditName(me.name);
+      setEditAvatar(me.avatar);
+      setIsEditingProfile(true);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!editName.trim()) return;
+    await handleAction('update_profile', () => updatePlayerProfile(editName.trim(), editAvatar));
+    setIsEditingProfile(false);
+  };
+
+  const handleUpdateSettings = async (settings: any, password?: string) => {
+    await handleAction('update_settings', () => updateRoomSettings(settings, password));
+    setShowSettings(false);
+  };
 
   // Check if all players (excluding the creator) are ready
   const allOtherPlayersReady = playersList
@@ -83,7 +109,14 @@ export const Lobby: React.FC = () => {
 
         {/* Room configurations info */}
         <div className="lobby-settings-info">
-          <h3>Reglas de la Sala:</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h3 style={{ margin: 0 }}>Reglas de la Sala:</h3>
+            {isCreator && (
+              <button className="cta-button link-btn" onClick={() => setShowSettings(true)} style={{ fontSize: '12px', padding: '4px 8px' }}>
+                <Settings size={14} style={{ display: 'inline', marginRight: '4px' }} /> Configurar
+              </button>
+            )}
+          </div>
           <div className="settings-chips">
             <span className="settings-chip">
               ⏱️ Tiempo de turno: {room.settings.turnTimeLimit > 0 ? `${room.settings.turnTimeLimit}s` : 'Ilimitado'}
@@ -105,17 +138,45 @@ export const Lobby: React.FC = () => {
               const isPlayerCreator = player.id === room.creatorId;
               return (
                 <div key={player.id} className={`player-row ${player.id === playerId ? 'me' : ''}`}>
-                  <span className="player-avatar">{player.avatar}</span>
-                  <span className="player-name">
-                    {player.name} {player.id === playerId ? ' (Tú)' : ''}
-                    {isPlayerCreator && <Crown size={14} className="creator-icon" />}
-                  </span>
+                  {player.id === playerId && isEditingProfile ? (
+                    <div style={{ display: 'flex', gap: '8px', flexGrow: 1, alignItems: 'center' }}>
+                      <select 
+                        value={editAvatar} 
+                        onChange={(e) => setEditAvatar(e.target.value)}
+                        style={{ padding: '4px', borderRadius: '4px', fontSize: '16px' }}
+                      >
+                         {AVATARS.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                      <input 
+                        type="text" 
+                        value={editName} 
+                        onChange={(e) => setEditName(e.target.value.slice(0, 12))} 
+                        style={{ maxWidth: '120px', padding: '4px 8px' }}
+                      />
+                      <button onClick={saveProfile} className="icon-btn success" title="Guardar" style={{ width: '32px', height: '32px' }}>
+                        {processingAction === 'update_profile' ? <span className="loading-spinner-small"></span> : <Save size={14} />}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="player-avatar">{player.avatar}</span>
+                      <span className="player-name">
+                        {player.name} {player.id === playerId ? ' (Tú)' : ''}
+                        {isPlayerCreator && <Crown size={14} className="creator-icon" />}
+                        {player.id === playerId && !isEditingProfile && (
+                           <button onClick={startEditingProfile} className="icon-btn" style={{ marginLeft: '8px', width: '24px', height: '24px' }} title="Editar Perfil">
+                             <Edit2 size={12} />
+                           </button>
+                        )}
+                      </span>
+                    </>
+                  )}
                   <div className="player-status-group">
                     <span className={`status-badge ${player.isReady ? 'ready' : 'pending'}`}>
                       {player.isReady ? 'Listo' : 'Esperando...'}
                     </span>
                     {isCreator && player.id !== playerId && (
-                      <div className="admin-actions">
+                      <div className="admin-actions" style={{ display: 'flex', gap: '4px', flexDirection: 'row' }}>
                         <button 
                           className="icon-btn admin-btn" 
                           title="Hacer Creador" 
@@ -184,6 +245,12 @@ export const Lobby: React.FC = () => {
           )}
         </div>
       </div>
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onConfirm={handleUpdateSettings}
+      />
     </div>
   );
 };

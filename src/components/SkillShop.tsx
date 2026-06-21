@@ -8,6 +8,7 @@ export const SkillShop: React.FC = () => {
   const [customTargetId, setCustomTargetId] = useState<string>('');
   const [customText, setCustomText] = useState<string>('');
   const [showCustomForm, setShowCustomForm] = useState(false);
+  const [showTransferForm, setShowTransferForm] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
 
   const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
@@ -50,6 +51,13 @@ export const SkillShop: React.FC = () => {
       desc: 'Escribe un reto personalizado y dirígelo a un jugador específico para su próximo turno.',
       enabled: room.settings.enabledSkills.customTargetQuestion,
     },
+    {
+      id: 'transferChallenge' as const,
+      name: 'Transferir Reto',
+      emoji: '🔀',
+      desc: '¡Pasa la papa caliente! Transfiere tu reto actual a cualquier otro jugador.',
+      enabled: room.settings.enabledSkills.transferChallenge,
+    },
   ];
 
   const handleUseCustom = (e: React.FormEvent) => {
@@ -60,6 +68,16 @@ export const SkillShop: React.FC = () => {
       setCustomText('');
       setCustomTargetId('');
       setShowCustomForm(false);
+    });
+  };
+
+  const handleUseTransfer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customTargetId) return;
+
+    handleAction('transfer_challenge', () => triggerSkill('transferChallenge', customTargetId)).then(() => {
+      setCustomTargetId('');
+      setShowTransferForm(false);
     });
   };
 
@@ -117,19 +135,20 @@ export const SkillShop: React.FC = () => {
               const isUsable = 
                 (skillId === 'skipTurn' && isMyTurn && isSelectingOrWaiting) ||
                 (skillId === 'changeQuestion' && isMyTurn && room.status === 'WAITING_RESPONSE') ||
-                (skillId === 'customTargetQuestion');
+                (skillId === 'customTargetQuestion') ||
+                (skillId === 'transferChallenge' && isMyTurn && room.status === 'WAITING_RESPONSE');
 
               return (
                 <div key={idx} className={`inventory-item ${isUsable ? 'usable' : 'locked'}`}>
                   <span className="inv-emoji">{details.emoji}</span>
                   <div className="inv-info">
                     <h4>{details.name}</h4>
-                    {!isUsable && (skillId === 'skipTurn' || skillId === 'changeQuestion') && (
+                    {!isUsable && (skillId === 'skipTurn' || skillId === 'changeQuestion' || skillId === 'transferChallenge') && (
                       <span className="usage-warning">Sólo en tu turno</span>
                     )}
                   </div>
                   
-                  {skillId !== 'customTargetQuestion' ? (
+                  {skillId !== 'customTargetQuestion' && skillId !== 'transferChallenge' ? (
                     <button
                       onClick={() => handleAction(`use_${skillId}`, () => triggerSkill(skillId))}
                       disabled={!isUsable || processingAction !== null}
@@ -139,7 +158,11 @@ export const SkillShop: React.FC = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => setShowCustomForm(!showCustomForm)}
+                      onClick={() => {
+                        if (skillId === 'customTargetQuestion') setShowCustomForm(!showCustomForm);
+                        if (skillId === 'transferChallenge') setShowTransferForm(!showTransferForm);
+                      }}
+                      disabled={!isUsable}
                       className="cta-button primary use-btn"
                     >
                       <Play size={12} /> Preparar
@@ -200,6 +223,48 @@ export const SkillShop: React.FC = () => {
                 </button>
                 <button type="submit" className="cta-button primary" disabled={!customTargetId || !customText.trim() || processingAction !== null}>
                   {processingAction === 'custom_target' ? <span className="loading-spinner-small"></span> : <><Send size={14} /> Enviar al Jugador</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Target transfer setup form */}
+      {showTransferForm && (
+        <div className="modal-backdrop">
+          <div className="modal-content glass-card custom-skill-form">
+            <div className="modal-header">
+              <h2>Transferir Reto</h2>
+              <button className="close-btn" onClick={() => setShowTransferForm(false)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleUseTransfer} className="settings-form">
+              <div className="form-group">
+                <label htmlFor="targetPlayerTransfer">Elegir Víctima:</label>
+                <select
+                  id="targetPlayerTransfer"
+                  value={customTargetId}
+                  onChange={(e) => setCustomTargetId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Seleccionar Jugador --</option>
+                  {Object.values(room.players)
+                    .filter((p) => p.id !== playerId)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.avatar} {p.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="cta-button secondary" onClick={() => setShowTransferForm(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="cta-button primary" disabled={!customTargetId || processingAction !== null}>
+                  {processingAction === 'transfer_challenge' ? <span className="loading-spinner-small"></span> : <><Send size={14} /> Transferir</>}
                 </button>
               </div>
             </form>

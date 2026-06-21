@@ -9,14 +9,16 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [timeLimit, setTimeLimit] = useState<number>(30); // default 30s
-  const [hasTimeLimit, setHasTimeLimit] = useState<boolean>(true);
+  const [hasTimeLimit, setHasTimeLimit] = useState<boolean>(false);
   const [allowGifting, setAllowGifting] = useState<boolean>(true);
+  const [showScores, setShowScores] = useState<boolean>(false);
   const [usePassword, setUsePassword] = useState<boolean>(false);
   const [password, setPassword] = useState<string>('');
   const [skills, setSkills] = useState({
     skipTurn: true,
     changeQuestion: true,
     customTargetQuestion: true,
+    transferChallenge: true,
   });
 
   if (!isOpen) return null;
@@ -26,6 +28,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     onConfirm({
       turnTimeLimit: hasTimeLimit ? timeLimit : 0,
       allowGiftingPoints: allowGifting,
+      showScores: showScores,
       enabledSkills: skills,
     }, usePassword ? password.trim() : undefined);
   };
@@ -102,6 +105,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             </label>
           </div>
 
+          {/* Show scores toggle */}
+          <div className="toggle-group">
+            <label className="switch-label">
+              <input
+                type="checkbox"
+                checked={showScores}
+                onChange={(e) => setShowScores(e.target.checked)}
+              />
+              <span className="switch-text">Mostrar puntajes de todos los jugadores</span>
+            </label>
+          </div>
+
           {/* Enabled skills selection */}
           <div className="skills-settings-section">
             <h3>Habilidades Activas en la Tienda:</h3>
@@ -133,6 +148,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                   onChange={(e) => setSkills({ ...skills, customTargetQuestion: e.target.checked })}
                 />
                 <span className="switch-text">🎯 Crear reto personalizado para otro jugador</span>
+              </label>
+
+              <label className="switch-label">
+                <input
+                  type="checkbox"
+                  checked={skills.transferChallenge}
+                  onChange={(e) => setSkills({ ...skills, transferChallenge: e.target.checked })}
+                />
+                <span className="switch-text">🔀 Transferir el reto a otra persona</span>
               </label>
             </div>
           </div>

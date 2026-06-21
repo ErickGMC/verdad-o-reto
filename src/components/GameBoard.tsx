@@ -147,13 +147,13 @@ export const GameBoard: React.FC = () => {
                       <button onClick={() => handleAction('dare_leve', () => selectCategory('dare_leve'))} disabled={processingAction !== null} className="pick-card dare leve">
                         <span className="pick-emoji">{processingAction === 'dare_leve' ? <span className="loading-spinner-small"></span> : '🤪'}</span>
                         <h4>Reto Leve</h4>
-                        <span className="points-badge">+10 pts</span>
+                        <span className="points-badge">+20 pts</span>
                       </button>
 
                       <button onClick={() => handleAction('dare_picante', () => selectCategory('dare_picante'))} disabled={processingAction !== null} className="pick-card dare picante">
                         <span className="pick-emoji">{processingAction === 'dare_picante' ? <span className="loading-spinner-small"></span> : '🔥'}</span>
                         <h4>Reto Picante</h4>
-                        <span className="points-badge">+20 pts</span>
+                        <span className="points-badge">+30 pts</span>
                       </button>
                     </div>
                   </>
@@ -251,7 +251,7 @@ export const GameBoard: React.FC = () => {
                 </p>
                 <p className="score-reward">
                   {passed 
-                    ? `Puntos ganados por ${activePlayer?.name}: +${room.currentTurn.typeSelected?.endsWith('picante') || room.currentTurn.typeSelected === 'custom' ? '20' : '10'} pts`
+                    ? `Puntos ganados por ${activePlayer?.name}: +${room.currentTurn.typeSelected === 'dare_picante' ? '30' : (room.currentTurn.typeSelected === 'dare_leve' || room.currentTurn.typeSelected === 'truth_picante' || room.currentTurn.typeSelected === 'custom' ? '20' : '10')} pts`
                     : 'No sumó puntos en esta ronda.'
                   }
                 </p>
@@ -273,11 +273,18 @@ export const GameBoard: React.FC = () => {
         <div className="leaderboard-card glass-card">
           <div className="board-header">
             <Trophy className="trophy-icon" />
-            <h3>Puntajes</h3>
+            <h3>Turnos por Venir</h3>
           </div>
           <div className="standings-list">
             {playersList
-              .sort((a, b) => b.score - a.score)
+              .sort((a, b) => {
+                 const getOrder = (id: string) => {
+                    const idx = room.playerOrder.indexOf(id);
+                    if (idx === -1) return 999;
+                    return (idx - room.currentTurnIdx + room.playerOrder.length) % room.playerOrder.length;
+                 };
+                 return getOrder(a.id) - getOrder(b.id);
+              })
               .map((p, idx) => {
                 const isActive = p.id === room.currentTurn?.activePlayerId;
                 return (
@@ -288,7 +295,11 @@ export const GameBoard: React.FC = () => {
                       {p.name}
                       {p.id === room.creatorId && ' 👑'}
                     </span>
-                    <span className="score"><strong>{p.score}</strong> pts</span>
+                    {p.id === playerId || room.settings.showScores ? (
+                      <span className="score"><strong>{p.score}</strong> pts</span>
+                    ) : (
+                      <span className="score" style={{ opacity: 0.5 }}>??? pts</span>
+                    )}
                     {playerId === room.creatorId && p.id !== playerId && (
                       <div className="admin-actions" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
                         <button 

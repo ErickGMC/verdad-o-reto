@@ -20,12 +20,14 @@ interface GameContextType {
   submitResponse: () => Promise<void>;
   castVote: (vote: 'COMPLIED' | 'FAILED') => Promise<void>;
   nextTurn: () => Promise<void>;
-  buySkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion') => Promise<void>;
-  triggerSkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion', targetPlayerId?: string, customText?: string) => Promise<void>;
+  buySkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge') => Promise<void>;
+  triggerSkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge', targetPlayerId?: string, customText?: string) => Promise<void>;
   giftPoints: (toPlayerId: string, amount: number) => Promise<void>;
   leaveRoom: () => Promise<void>;
   kickPlayer: (targetId: string) => Promise<void>;
   transferCreator: (targetId: string) => Promise<void>;
+  updatePlayerProfile: (name: string, avatar: string) => Promise<void>;
+  updateRoomSettings: (settings: RoomSettings, password?: string) => Promise<void>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);

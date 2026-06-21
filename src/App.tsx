@@ -4,6 +4,8 @@ import { Lobby } from './components/Lobby';
 import { GameBoard } from './components/GameBoard';
 import { SkillShop } from './components/SkillShop';
 import { SettingsModal } from './components/SettingsModal';
+import { AboutModal } from './components/AboutModal';
+import { InstructionsModal } from './components/InstructionsModal';
 import { AlertProvider, useAlert } from './context/AlertContext';
 import { isFirebaseConfigured } from './config/firebase';
 import { LogOut } from 'lucide-react';
@@ -20,6 +22,8 @@ function GameContent() {
   const [joinCode, setJoinCode] = useState<string>('');
   const [joinPassword, setJoinPassword] = useState<string>('');
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showAbout, setShowAbout] = useState<boolean>(false);
+  const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [joinMode, setJoinMode] = useState<boolean>(false);
 
@@ -113,7 +117,7 @@ function GameContent() {
 
           <div className="header-actions">
             <span className={`connection-badge ${isFirebaseConfigured ? 'online' : 'local'}`}>
-              {isFirebaseConfigured ? '🟢 Online' : '🔵 Modo Demo Local'}
+              {isFirebaseConfigured ? '🟢 Conectado al servidor' : '🔵 Modo Local'}
             </span>
             <span className="room-code-badge">Sala: <strong>{room.id}</strong></span>
             <button onClick={handleExit} className="exit-game-btn" title="Salir del Juego">
@@ -143,7 +147,7 @@ function GameContent() {
             <h2>Verdad o Reto</h2>
           </div>
           <span className={`connection-badge ${isFirebaseConfigured ? 'online' : 'local'}`}>
-            {isFirebaseConfigured ? '🟢 Online' : '🔵 Modo Demo Local'}
+            {isFirebaseConfigured ? '🟢 Conectado al servidor' : '🔵 Modo Local'}
           </span>
         </header>
         <main className="main-content flex-grow">
@@ -172,7 +176,7 @@ function GameContent() {
 
         {/* Firebase Config Mode Alert indicator */}
         <span className={`connection-badge ${isFirebaseConfigured ? 'online' : 'local'}`} style={{ margin: '-10px auto 10px auto' }}>
-          {isFirebaseConfigured ? '🟢 Conectado a Firebase' : '🔵 Ejecutando en Modo Local (Múltiples Pestañas)'}
+          {isFirebaseConfigured ? '🟢 Conectado al servidor' : '🔵 Modo Local'}
         </span>
 
         {error && <div className="error-banner">{error}</div>}
@@ -275,6 +279,15 @@ function GameContent() {
             </form>
           )}
         </div>
+        
+        <div style={{ textAlign: 'center', marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button className="cta-button link-btn" onClick={() => setShowInstructions(true)}>
+            Instrucciones
+          </button>
+          <button className="cta-button link-btn" onClick={() => setShowAbout(true)}>
+            Sobre este juego
+          </button>
+        </div>
       </div>
 
       {/* Settings Modal popup */}
@@ -282,6 +295,16 @@ function GameContent() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onConfirm={handleCreateRoom}
+      />
+
+      <AboutModal
+        isOpen={showAbout}
+        onClose={() => setShowAbout(false)}
+      />
+
+      <InstructionsModal
+        isOpen={showInstructions}
+        onClose={() => setShowInstructions(false)}
       />
     </div>
   );
