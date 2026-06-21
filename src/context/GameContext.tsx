@@ -60,13 +60,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return code;
   };
 
+  const [isExiting, setIsExiting] = useState(false);
+
   const exitRoom = async () => {
+    setIsExiting(true);
     try {
       await game.leaveRoom();
     } catch (e) {
       console.error('Error leaving room', e);
     }
     setRoomId(null);
+    // Simulate loading delay for UX
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setIsExiting(false);
   };
 
   // Wrap all actions to add context-level features if needed
@@ -74,6 +80,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <GameContext.Provider
       value={{
         ...game,
+        loading: game.loading || isExiting,
+        leaveRoom: exitRoom,
         currentRoomId,
         setRoomId: (id) => {
           if (id === null) {

@@ -176,7 +176,7 @@ export const GameBoard: React.FC = () => {
             </span>
             
             {/* The Challenge Content Card */}
-            <div className="challenge-card">
+            <div className={`challenge-card ${isMyTurn ? 'vibrant-active' : ''}`}>
               <p className="challenge-text">"{room.currentTurn.content}"</p>
             </div>
 

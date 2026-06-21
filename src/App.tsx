@@ -81,16 +81,8 @@ function GameContent() {
   };
 
   const handleExit = async () => {
-    // No confirmation needed per user request
-    setIsProcessing(true);
-    try {
-      await leaveRoom();
-      setRoomId(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsProcessing(false);
-    }
+    // GameContext will handle the loading state and RoomId reset
+    await leaveRoom();
   };
 
   // --- LOADING / STATUS SCREEN ---

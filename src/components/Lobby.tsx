@@ -5,7 +5,7 @@ import { Copy, Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save } fr
 import { SettingsModal } from './SettingsModal';
 
 export const Lobby: React.FC = () => {
-  const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom, kickPlayer, transferCreator, updatePlayerProfile, updateRoomSettings } = useGame();
+  const { room, playerId, toggleReady, startGame, leaveRoom, kickPlayer, transferCreator, updatePlayerProfile, updateRoomSettings } = useGame();
   const { showConfirm } = useAlert();
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -222,8 +222,8 @@ export const Lobby: React.FC = () => {
 
         {/* Actions buttons */}
         <div className="lobby-actions">
-          <button onClick={() => handleAction('leave', async () => { await leaveRoom(); setRoomId(null); })} className="cta-button secondary" disabled={processingAction !== null}>
-            {processingAction === 'leave' ? <span className="loading-spinner-small"></span> : 'Salir de la Sala'}
+          <button onClick={leaveRoom} className="cta-button secondary" disabled={processingAction !== null}>
+            Salir de la Sala
           </button>
 
           {!isCreator ? (

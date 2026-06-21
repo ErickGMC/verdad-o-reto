@@ -1610,3 +1610,45 @@
   filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.5));
 }
 
+
+/* Custom fix for join form spacing */
+.join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.join-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255,255,255,0.05);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.join-form .form-group label {
+  font-weight: 700;
+  color: var(--neon-blue);
+  font-size: 14px;
+}
+
+/* Vibrant Active class for Challenge Card */
+.challenge-card.vibrant-active {
+  animation: vibrant-glow 1.5s infinite alternate;
+  border: 2px solid var(--neon-pink);
+  background: rgba(236, 72, 153, 0.15);
+  transform: scale(1.02);
+  transition: all 0.3s ease;
+}
+
+@keyframes vibrant-glow {
+  from {
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.4), inset 0 0 10px rgba(236, 72, 153, 0.2);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(236, 72, 153, 0.9), inset 0 0 20px rgba(236, 72, 153, 0.6);
+  }
+}
