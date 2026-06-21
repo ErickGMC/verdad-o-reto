@@ -757,29 +757,35 @@ export function useGameRoom(roomId: string | null) {
         nextState.creatorId = updatedOrder[0];
       }
 
-      // Handle Active Player leaving
-      if (current.currentTurn && current.currentTurn.activePlayerId === playerId && current.status !== 'LOBBY') {
-        // Skip turn to next person
-        const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
-        const nextPlayerId = updatedOrder[nextIdx];
+      // If only 1 player remains, abort the game and return to LOBBY
+      if (updatedOrder.length <= 1 && current.status !== 'LOBBY') {
+        nextState.status = 'LOBBY';
+        nextState.currentTurn = null;
+      } else {
+        // Handle Active Player leaving
+        if (current.currentTurn && current.currentTurn.activePlayerId === playerId && current.status !== 'LOBBY') {
+          // Skip turn to next person
+          const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
+          const nextPlayerId = updatedOrder[nextIdx];
 
-        nextState.status = 'SELECTING';
-        nextState.currentTurnIdx = nextIdx;
-        nextState.currentTurn = {
-          activePlayerId: nextPlayerId,
-          typeSelected: null,
-          content: '',
-          votes: {},
-          startedAt: Date.now()
-        };
-      } else if (current.currentTurn && current.status === 'VOTING') {
-        // If a voter leaves during voting, remove their vote if any
-        const updatedVotes = { ...current.currentTurn.votes };
-        delete updatedVotes[playerId];
-        nextState.currentTurn = {
-          ...current.currentTurn,
-          votes: updatedVotes
-        };
+          nextState.status = 'SELECTING';
+          nextState.currentTurnIdx = nextIdx;
+          nextState.currentTurn = {
+            activePlayerId: nextPlayerId,
+            typeSelected: null,
+            content: '',
+            votes: {},
+            startedAt: Date.now()
+          };
+        } else if (current.currentTurn && current.status === 'VOTING') {
+          // If a voter leaves during voting, remove their vote if any
+          const updatedVotes = { ...current.currentTurn.votes };
+          delete updatedVotes[playerId];
+          nextState.currentTurn = {
+            ...current.currentTurn,
+            votes: updatedVotes
+          };
+        }
       }
 
       return nextState;
@@ -803,27 +809,33 @@ export function useGameRoom(roomId: string | null) {
         playerOrder: updatedOrder
       };
 
-      // Handle Active Player leaving
-      if (current.currentTurn && current.currentTurn.activePlayerId === targetPlayerId && current.status !== 'LOBBY') {
-        const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
-        const nextPlayerId = updatedOrder[nextIdx];
+      // If only 1 player remains, abort the game and return to LOBBY
+      if (updatedOrder.length <= 1 && current.status !== 'LOBBY') {
+        nextState.status = 'LOBBY';
+        nextState.currentTurn = null;
+      } else {
+        // Handle Active Player leaving
+        if (current.currentTurn && current.currentTurn.activePlayerId === targetPlayerId && current.status !== 'LOBBY') {
+          const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
+          const nextPlayerId = updatedOrder[nextIdx];
 
-        nextState.status = 'SELECTING';
-        nextState.currentTurnIdx = nextIdx;
-        nextState.currentTurn = {
-          activePlayerId: nextPlayerId,
-          typeSelected: null,
-          content: '',
-          votes: {},
-          startedAt: Date.now()
-        };
-      } else if (current.currentTurn && current.status === 'VOTING') {
-        const updatedVotes = { ...current.currentTurn.votes };
-        delete updatedVotes[targetPlayerId];
-        nextState.currentTurn = {
-          ...current.currentTurn,
-          votes: updatedVotes
-        };
+          nextState.status = 'SELECTING';
+          nextState.currentTurnIdx = nextIdx;
+          nextState.currentTurn = {
+            activePlayerId: nextPlayerId,
+            typeSelected: null,
+            content: '',
+            votes: {},
+            startedAt: Date.now()
+          };
+        } else if (current.currentTurn && current.status === 'VOTING') {
+          const updatedVotes = { ...current.currentTurn.votes };
+          delete updatedVotes[targetPlayerId];
+          nextState.currentTurn = {
+            ...current.currentTurn,
+            votes: updatedVotes
+          };
+        }
       }
 
       return nextState;
