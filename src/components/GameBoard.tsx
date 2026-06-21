@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
+import { useAlert } from '../context/AlertContext';
 import { Gift, Check, X, Timer, Trophy, Crown, UserMinus } from 'lucide-react';
 
 export const GameBoard: React.FC = () => {
@@ -14,6 +15,7 @@ export const GameBoard: React.FC = () => {
     kickPlayer,
     transferCreator,
   } = useGame();
+  const { showConfirm } = useAlert();
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [giftTargetId, setGiftTargetId] = useState<string>('');
@@ -301,9 +303,9 @@ export const GameBoard: React.FC = () => {
                           className="icon-btn admin-btn danger" 
                           title="Expulsar Jugador" 
                           onClick={() => {
-                            if (window.confirm(`¿Expulsar a ${p.name}?`)) {
+                            showConfirm(`¿Seguro que deseas expulsar a ${p.name} de la sala?`, () => {
                               handleAction(`kick_${p.id}`, () => kickPlayer(p.id));
-                            }
+                            }, 'Expulsar Jugador');
                           }}
                           disabled={processingAction !== null}
                         >

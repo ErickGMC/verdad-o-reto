@@ -4,6 +4,7 @@ import { Lobby } from './components/Lobby';
 import { GameBoard } from './components/GameBoard';
 import { SkillShop } from './components/SkillShop';
 import { SettingsModal } from './components/SettingsModal';
+import { AlertProvider, useAlert } from './context/AlertContext';
 import { isFirebaseConfigured } from './config/firebase';
 import { LogOut } from 'lucide-react';
 import type { RoomSettings } from './hooks/useGameRoom';
@@ -13,6 +14,7 @@ const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁',
 
 function GameContent() {
   const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error, playerId } = useGame();
+  const { showAlert } = useAlert();
   const [name, setName] = useState<string>(() => sessionStorage.getItem('vor_player_name') || '');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🦊');
   const [joinCode, setJoinCode] = useState<string>('');
@@ -25,11 +27,11 @@ function GameContent() {
   useEffect(() => {
     if (room && playerId && room.status !== 'FINISHED') {
       if (!room.players[playerId]) {
-        alert('Has sido expulsado de la sala por el creador.');
+        showAlert('Has sido expulsado de la sala por el creador.', 'warning', 'Expulsado');
         setRoomId(null);
       }
     }
-  }, [room?.players, playerId, setRoomId, room?.status]);
+  }, [room?.players, playerId, setRoomId, room?.status, showAlert]);
 
   // Check URL search parameters for automatic invite code redirection
   useEffect(() => {
@@ -52,7 +54,7 @@ function GameContent() {
       setShowSettings(false);
     } catch (err) {
       const errorVal = err as Error;
-      alert(errorVal.message || 'Error al crear la sala');
+      showAlert(errorVal.message || 'Error al crear la sala', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -70,23 +72,22 @@ function GameContent() {
       }
     } catch (err) {
       const errorVal = err as Error;
-      alert(errorVal.message || 'Error al unirse a la sala');
+      showAlert(errorVal.message || 'Error al unirse a la sala', 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleExit = async () => {
-    if (window.confirm('¿Seguro que deseas salir de la partida actual?')) {
-      setIsProcessing(true);
-      try {
-        await leaveRoom();
-        setRoomId(null);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsProcessing(false);
-      }
+    // No confirmation needed per user request
+    setIsProcessing(true);
+    try {
+      await leaveRoom();
+      setRoomId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -214,7 +215,7 @@ function GameContent() {
             <div className="welcome-actions">
               <button
                 onClick={() => {
-                  if (!name.trim()) return alert('Por favor, ingresa tu nombre.');
+                  if (!name.trim()) return showAlert('Por favor, ingresa tu nombre.', 'warning');
                   setShowSettings(true);
                 }}
                 className="cta-button primary"
@@ -290,8 +291,10 @@ function GameContent() {
 
 export default function App() {
   return (
-    <GameProvider>
-      <GameContent />
-    </GameProvider>
+    <AlertProvider>
+      <GameProvider>
+        <GameContent />
+      </GameProvider>
+    </AlertProvider>
   );
 }

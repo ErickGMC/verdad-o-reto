@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
+import { useAlert } from '../context/AlertContext';
 import { Copy, Share2, Crown, AlertCircle, UserMinus } from 'lucide-react';
 
 export const Lobby: React.FC = () => {
   const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom, kickPlayer, transferCreator } = useGame();
+  const { showConfirm } = useAlert();
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
@@ -126,9 +128,9 @@ export const Lobby: React.FC = () => {
                           className="icon-btn admin-btn danger" 
                           title="Expulsar Jugador" 
                           onClick={() => {
-                            if (window.confirm(`¿Expulsar a ${player.name}?`)) {
+                            showConfirm(`¿Seguro que deseas expulsar a ${player.name} de la sala?`, () => {
                               handleAction(`kick_${player.id}`, () => kickPlayer(player.id));
-                            }
+                            }, 'Expulsar Jugador');
                           }}
                           disabled={processingAction !== null}
                         >
