@@ -226,11 +226,12 @@ function GameContent() {
             </div>
           ) : (
             <form onSubmit={handleJoinRoom} className="join-form">
-              <div className="form-group">
-                <label htmlFor="roomCode">Introduce el Código de la Sala:</label>
+              <div className="form-group code-group">
+                <label htmlFor="roomCode">📝 Introduce el Código de la Sala:</label>
                 <input
                   type="text"
                   id="roomCode"
+                  className="input-room-code"
                   placeholder="Ej: FR8A7X"
                   maxLength={6}
                   value={joinCode}
@@ -239,11 +240,12 @@ function GameContent() {
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="joinPassword">Contraseña de Sala (Si tiene):</label>
+              <div className="form-group password-group">
+                <label htmlFor="joinPassword">🔒 Contraseña de Sala (Si tiene):</label>
                 <input
                   type="text"
                   id="joinPassword"
+                  className="input-room-password"
                   placeholder="Dejar en blanco si no tiene"
                   value={joinPassword}
                   onChange={(e) => setJoinPassword(e.target.value)}
