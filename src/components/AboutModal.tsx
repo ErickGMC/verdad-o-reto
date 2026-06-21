@@ -25,17 +25,34 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             <h3 className="author-name">Erick Martinez Capcha</h3>
             <p className="author-role">Desarrollador Web</p>
             
-            <div className="contact-methods">
-              <div className="contact-item">
+            <div className="contact-methods" style={{ marginTop: '12px' }}>
+              <div className="contact-item" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <Smartphone size={16} />
                 <span>997346193</span>
               </div>
-              <div className="payment-badges">
-                <span className="payment-badge yape">Yape</span>
-                <span className="payment-badge plin">Plin</span>
+              <div className="contact-item" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
+                <span style={{ fontSize: '18px' }}>✉️</span>
+                <a href="mailto:erickmartinezc@gmail.com" style={{ color: 'var(--neon-blue)', textDecoration: 'none' }}>erickmartinezc@gmail.com</a>
               </div>
             </div>
-            <p className="contact-note">¡Contáctame para proyectos, ideas o invitame un café! <Coffee size={14} style={{ display: 'inline', marginLeft: '4px' }} /></p>
+            
+            <p className="contact-note" style={{ marginTop: '16px', lineHeight: '1.5' }}>
+              ¡Acepto con gusto cualquier sugerencia, crítica constructiva o ideas de nuevas funciones que te gustaría ver en el juego! Escríbeme y hagamos que este juego sea aún mejor.
+            </p>
+
+            <div className="support-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <div className="qr-container" style={{ background: '#fff', padding: '6px', borderRadius: '12px', display: 'inline-block' }}>
+                <img src="/yape-qr.png" alt="Yape QR" style={{ width: '90px', height: '90px', display: 'block', borderRadius: '8px' }} />
+              </div>
+              <div>
+                <p className="contact-note" style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                  Si te ha gustado, puedes invitarme un café <Coffee size={14} style={{ display: 'inline', marginLeft: '4px' }} />
+                </p>
+                <div className="payment-badges" style={{ marginTop: '8px' }}>
+                  <span className="payment-badge plin">Plin</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="about-philosophy glass-panel">
