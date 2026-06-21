@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
-import { CustomAlert, CustomAlertProps } from './CustomAlert';
+import { CustomAlert } from '../components/CustomAlert';
+import type { CustomAlertProps } from '../components/CustomAlert';
 
 interface AlertContextType {
   showAlert: (message: string, type?: 'info' | 'warning' | 'error' | 'success', title?: string) => void;
@@ -17,21 +18,21 @@ export const AlertProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const showAlert = (message: string, type: 'info' | 'warning' | 'error' | 'success' = 'info', title?: string) => {
-    setAlertConfig(prev => ({
+    setAlertConfig((prev: CustomAlertProps & { id: number }) => ({
       isOpen: true,
       message,
       type,
       title,
       confirmText: 'Aceptar',
       cancelText: undefined,
-      onConfirm: () => setAlertConfig(c => ({ ...c, isOpen: false })),
+      onConfirm: () => setAlertConfig((c: CustomAlertProps & { id: number }) => ({ ...c, isOpen: false })),
       onCancel: undefined,
       id: prev.id + 1,
     }));
   };
 
   const showConfirm = (message: string, onConfirm: () => void, title?: string) => {
-    setAlertConfig(prev => ({
+    setAlertConfig((prev: CustomAlertProps & { id: number }) => ({
       isOpen: true,
       message,
       type: 'warning',
@@ -39,10 +40,10 @@ export const AlertProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       confirmText: 'Sí, continuar',
       cancelText: 'Cancelar',
       onConfirm: () => {
-        setAlertConfig(c => ({ ...c, isOpen: false }));
+        setAlertConfig((c: CustomAlertProps & { id: number }) => ({ ...c, isOpen: false }));
         onConfirm();
       },
-      onCancel: () => setAlertConfig(c => ({ ...c, isOpen: false })),
+      onCancel: () => setAlertConfig((c: CustomAlertProps & { id: number }) => ({ ...c, isOpen: false })),
       id: prev.id + 1,
     }));
   };

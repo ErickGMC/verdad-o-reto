@@ -13,7 +13,7 @@ import './App.css';
 const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
 
 function GameContent() {
-  const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error, playerId } = useGame();
+  const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error, isKicked } = useGame();
   const { showAlert } = useAlert();
   const [name, setName] = useState<string>(() => sessionStorage.getItem('vor_player_name') || '');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🦊');
@@ -25,13 +25,11 @@ function GameContent() {
 
   // Listen to see if the current player was kicked from the active room
   useEffect(() => {
-    if (room && playerId && room.status !== 'FINISHED') {
-      if (!room.players[playerId]) {
-        showAlert('Has sido expulsado de la sala por el creador.', 'warning', 'Expulsado');
-        setRoomId(null);
-      }
+    if (isKicked) {
+      showAlert('Has sido expulsado de la sala por el creador.', 'warning', 'Expulsado');
+      setRoomId(null);
     }
-  }, [room?.players, playerId, setRoomId, room?.status, showAlert]);
+  }, [isKicked, setRoomId, showAlert]);
 
   // Check URL search parameters for automatic invite code redirection
   useEffect(() => {

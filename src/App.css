@@ -1428,54 +1428,53 @@
   display: inline-block;
 }
 
- / *   A l e r t   M o d a l   S t y l e s   * / 
- . a l e r t - m o d a l   { 
-     m a x - w i d t h :   4 0 0 p x ; 
-     t e x t - a l i g n :   c e n t e r ; 
-     p a d d i n g :   3 0 p x ; 
- } 
- 
- . a l e r t - h e a d e r   { 
-     d i s p l a y :   f l e x ; 
-     f l e x - d i r e c t i o n :   c o l u m n ; 
-     a l i g n - i t e m s :   c e n t e r ; 
-     g a p :   1 5 p x ; 
-     m a r g i n - b o t t o m :   2 0 p x ; 
- } 
- 
- . a l e r t - i c o n   { 
-     w i d t h :   4 8 p x ; 
-     h e i g h t :   4 8 p x ; 
- } 
- 
- . a l e r t - i c o n . i n f o   {   c o l o r :   # 3 4 9 8 d b ;   } 
- . a l e r t - i c o n . w a r n i n g   {   c o l o r :   # f 1 c 4 0 f ;   } 
- . a l e r t - i c o n . e r r o r   {   c o l o r :   # e 7 4 c 3 c ;   } 
- . a l e r t - i c o n . s u c c e s s   {   c o l o r :   # 2 e c c 7 1 ;   } 
- 
- . a l e r t - h e a d e r   h 2   { 
-     f o n t - s i z e :   1 . 5 r e m ; 
-     m a r g i n :   0 ; 
-     c o l o r :   v a r ( - - t e x t - c o l o r ) ; 
- } 
- 
- . a l e r t - b o d y   p   { 
-     c o l o r :   # c c c ; 
-     f o n t - s i z e :   1 . 1 r e m ; 
-     m a r g i n - b o t t o m :   3 0 p x ; 
- } 
- 
- . a l e r t - f o o t e r   { 
-     j u s t i f y - c o n t e n t :   c e n t e r ; 
-     g a p :   1 5 p x ; 
- } 
- 
- . d a n g e r - b g   { 
-     b a c k g r o u n d :   v a r ( - - d a n g e r - c o l o r )   ! i m p o r t a n t ; 
- } 
- . d a n g e r - b g : h o v e r   { 
-     b a c k g r o u n d :   # c 0 3 9 2 b   ! i m p o r t a n t ; 
-     b o x - s h a d o w :   0   0   1 5 p x   r g b a ( 2 3 1 ,   7 6 ,   6 0 ,   0 . 5 ) ; 
- } 
-  
- 
+/* Alert Modal Styles */
+.alert-modal {
+  max-width: 400px;
+  text-align: center;
+  padding: 30px;
+}
+
+.alert-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.alert-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.alert-icon.info { color: #3498db; }
+.alert-icon.warning { color: #f1c40f; }
+.alert-icon.error { color: #e74c3c; }
+.alert-icon.success { color: #2ecc71; }
+
+.alert-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: var(--text-color);
+}
+
+.alert-body p {
+  color: #ccc;
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+}
+
+.alert-footer {
+  justify-content: center;
+  gap: 15px;
+}
+
+.danger-bg {
+  background: var(--danger-color) !important;
+}
+.danger-bg:hover {
+  background: #c0392b !important;
+  box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
+}
+

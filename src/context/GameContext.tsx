@@ -9,6 +9,7 @@ interface GameContextType {
   playerName: string;
   loading: boolean;
   error: string | null;
+  isKicked: boolean;
   currentRoomId: string | null;
   setRoomId: (id: string | null) => void;
   createRoom: (creatorName: string, settings: RoomSettings, avatar: string, password?: string) => Promise<string>;

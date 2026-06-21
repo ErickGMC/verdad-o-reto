@@ -91,6 +91,8 @@ export function useGameRoom(roomId: string | null) {
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isKicked, setIsKicked] = useState<boolean>(false);
+  const isLeavingRef = useRef<boolean>(false);
   
   // Persist playerId in sessionStorage so it survives page reloads
   const [playerId] = useState<string>(() => {
@@ -136,7 +138,11 @@ export function useGameRoom(roomId: string | null) {
       const unsubscribe = onSnapshot(docRef, 
         (snapshot) => {
           if (snapshot.exists()) {
-            setRoom(snapshot.data() as Room);
+            const newRoom = snapshot.data() as Room;
+            if (newRoom.players && !newRoom.players[playerId] && !isLeavingRef.current) {
+              setIsKicked(true);
+            }
+            setRoom(newRoom);
           } else {
             setError('La sala de juego no existe.');
             setRoom(null);
@@ -179,7 +185,11 @@ export function useGameRoom(roomId: string | null) {
         const message = event.data;
         if (message && message.roomId === roomId) {
           if (message.type === 'UPDATE') {
-            setRoom(message.room);
+            const newRoom = message.room as Room;
+            if (newRoom.players && !newRoom.players[playerId] && !isLeavingRef.current) {
+              setIsKicked(true);
+            }
+            setRoom(newRoom);
           } else if (message.type === 'DELETE') {
             setRoom(null);
             setError('La sala fue eliminada.');
@@ -703,6 +713,7 @@ export function useGameRoom(roomId: string | null) {
 
   // 12. Leave Room securely
   const leaveRoom = async () => {
+    isLeavingRef.current = true;
     await mutateRoomState((current) => {
       const player = current.players[playerId];
       if (!player) return null; // Already not in the room
@@ -825,6 +836,7 @@ export function useGameRoom(roomId: string | null) {
     playerName,
     loading,
     error,
+    isKicked,
     createRoom,
     joinRoom,
     toggleReady,
