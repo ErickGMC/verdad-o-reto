@@ -215,7 +215,7 @@ export function useGameRoom(roomId: string | null) {
   // --- ATOMIC STATE MUTATOR ---
   // Helper to safely mutate the room state via transactions to avoid race conditions 
   // when millions of players are playing concurrently.
-  const mutateRoomState = async (updater: (currentRoom: Room) => Room | null) => {
+  const mutateRoomState = async (updater: (currentRoom: Room) => Room | null | 'DELETE') => {
     if (!roomId) return;
     
     if (isFirebaseConfigured && db) {
@@ -226,7 +226,10 @@ export function useGameRoom(roomId: string | null) {
         
         const currentRoom = sfDoc.data() as Room;
         const newRoom = updater(currentRoom);
-        if (newRoom) {
+        
+        if (newRoom === 'DELETE') {
+          transaction.delete(docRef);
+        } else if (newRoom) {
           transaction.set(docRef, newRoom);
         }
       });
@@ -238,7 +241,12 @@ export function useGameRoom(roomId: string | null) {
       if (!currentRoom) throw new Error("La sala no existe localmente.");
       
       const newRoom = updater(currentRoom);
-      if (newRoom) {
+      
+      if (newRoom === 'DELETE') {
+        delete roomsMap[roomId];
+        localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
+        setRoom(null);
+      } else if (newRoom) {
         roomsMap[newRoom.id] = newRoom;
         localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
         setRoom(newRoom);
@@ -737,13 +745,9 @@ export function useGameRoom(roomId: string | null) {
       
       const updatedOrder = current.playerOrder.filter(id => id !== playerId);
 
-      // If room is empty
+      // If room is empty, delete it
       if (updatedOrder.length === 0) {
-        return {
-          ...current,
-          players: {},
-          playerOrder: []
-        };
+        return 'DELETE';
       }
 
       let nextState: Room = {
@@ -802,6 +806,11 @@ export function useGameRoom(roomId: string | null) {
       delete updatedPlayers[targetPlayerId];
       
       const updatedOrder = current.playerOrder.filter(id => id !== targetPlayerId);
+
+      // If room is empty, delete it
+      if (updatedOrder.length === 0) {
+        return 'DELETE';
+      }
 
       let nextState: Room = {
         ...current,
