@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
-import { Gift, Check, X, Timer, Trophy } from 'lucide-react';
+import { Gift, Check, X, Timer, Trophy, Crown, UserMinus } from 'lucide-react';
 
 export const GameBoard: React.FC = () => {
   const {
@@ -11,6 +11,8 @@ export const GameBoard: React.FC = () => {
     castVote,
     nextTurn,
     giftPoints,
+    kickPlayer,
+    transferCreator,
   } = useGame();
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
@@ -285,6 +287,30 @@ export const GameBoard: React.FC = () => {
                       {p.id === room.creatorId && ' 👑'}
                     </span>
                     <span className="score"><strong>{p.score}</strong> pts</span>
+                    {playerId === room.creatorId && p.id !== playerId && (
+                      <div className="admin-actions" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                        <button 
+                          className="icon-btn admin-btn" 
+                          title="Hacer Creador" 
+                          onClick={() => handleAction(`crown_${p.id}`, () => transferCreator(p.id))}
+                          disabled={processingAction !== null}
+                        >
+                          {processingAction === `crown_${p.id}` ? <span className="loading-spinner-small"></span> : <Crown size={14} />}
+                        </button>
+                        <button 
+                          className="icon-btn admin-btn danger" 
+                          title="Expulsar Jugador" 
+                          onClick={() => {
+                            if (window.confirm(`¿Expulsar a ${p.name}?`)) {
+                              handleAction(`kick_${p.id}`, () => kickPlayer(p.id));
+                            }
+                          }}
+                          disabled={processingAction !== null}
+                        >
+                          {processingAction === `kick_${p.id}` ? <span className="loading-spinner-small"></span> : <UserMinus size={14} />}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

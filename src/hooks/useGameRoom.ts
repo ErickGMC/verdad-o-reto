@@ -60,6 +60,7 @@ export interface Room {
       text: string;
     };
   };
+  password?: string;
 }
 
 export const SKILL_COSTS = {
@@ -244,7 +245,7 @@ export function useGameRoom(roomId: string | null) {
   // --- ACTIONS ---
 
   // 1. Create a Game Room
-  const createRoom = async (creatorName: string, settings: RoomSettings, avatar: string) => {
+  const createRoom = async (creatorName: string, settings: RoomSettings, avatar: string, password?: string) => {
     savePlayerName(creatorName);
 
     let code = '';
@@ -288,7 +289,8 @@ export function useGameRoom(roomId: string | null) {
       playerOrder: [playerId],
       currentTurnIdx: 0,
       currentTurn: null,
-      customQueuedQuestions: {}
+      customQueuedQuestions: {},
+      ...(password ? { password } : {})
     };
 
     if (isFirebaseConfigured && db) {
@@ -305,7 +307,7 @@ export function useGameRoom(roomId: string | null) {
   };
 
   // 2. Join an Existing Room
-  const joinRoom = async (targetRoomId: string, name: string, avatar: string) => {
+  const joinRoom = async (targetRoomId: string, name: string, avatar: string, password?: string) => {
     const cleanedId = targetRoomId.toUpperCase().trim();
     savePlayerName(name);
 
@@ -330,6 +332,10 @@ export function useGameRoom(roomId: string | null) {
         throw new Error('La sala no existe. En Modo Demo Local, asegúrate de estar usando el mismo navegador (pestañas normales, no incógnito) ya que las salas locales se guardan en el LocalStorage y no se comparten entre navegadores o dispositivos.');
       }
       throw new Error('La sala no existe o el código es incorrecto.');
+    }
+
+    if (fetchedRoom.password && fetchedRoom.password !== password) {
+      throw new Error('Contraseña incorrecta para entrar a esta sala.');
     }
 
     if (isFirebaseConfigured && db) {
@@ -756,6 +762,63 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
+  // 13. Kick Player (Only Creator)
+  const kickPlayer = async (targetPlayerId: string) => {
+    await mutateRoomState((current) => {
+      if (current.creatorId !== playerId) return null; // Only creator can kick
+      if (!current.players[targetPlayerId]) return null;
+
+      const updatedPlayers = { ...current.players };
+      delete updatedPlayers[targetPlayerId];
+      
+      const updatedOrder = current.playerOrder.filter(id => id !== targetPlayerId);
+
+      let nextState: Room = {
+        ...current,
+        players: updatedPlayers,
+        playerOrder: updatedOrder
+      };
+
+      // Handle Active Player leaving
+      if (current.currentTurn && current.currentTurn.activePlayerId === targetPlayerId && current.status !== 'LOBBY') {
+        const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
+        const nextPlayerId = updatedOrder[nextIdx];
+
+        nextState.status = 'SELECTING';
+        nextState.currentTurnIdx = nextIdx;
+        nextState.currentTurn = {
+          activePlayerId: nextPlayerId,
+          typeSelected: null,
+          content: '',
+          votes: {},
+          startedAt: Date.now()
+        };
+      } else if (current.currentTurn && current.status === 'VOTING') {
+        const updatedVotes = { ...current.currentTurn.votes };
+        delete updatedVotes[targetPlayerId];
+        nextState.currentTurn = {
+          ...current.currentTurn,
+          votes: updatedVotes
+        };
+      }
+
+      return nextState;
+    });
+  };
+
+  // 14. Transfer Creator Privilege (Only Creator)
+  const transferCreator = async (targetPlayerId: string) => {
+    await mutateRoomState((current) => {
+      if (current.creatorId !== playerId) return null;
+      if (!current.players[targetPlayerId]) return null;
+
+      return {
+        ...current,
+        creatorId: targetPlayerId
+      };
+    });
+  };
+
   return {
     room,
     playerId,
@@ -774,5 +837,7 @@ export function useGameRoom(roomId: string | null) {
     triggerSkill,
     giftPoints,
     leaveRoom,
+    kickPlayer,
+    transferCreator,
   };
 }

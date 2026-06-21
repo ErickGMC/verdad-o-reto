@@ -12,13 +12,24 @@ import './App.css';
 const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
 
 function GameContent() {
-  const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error } = useGame();
+  const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error, playerId } = useGame();
   const [name, setName] = useState<string>(() => sessionStorage.getItem('vor_player_name') || '');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🦊');
   const [joinCode, setJoinCode] = useState<string>('');
+  const [joinPassword, setJoinPassword] = useState<string>('');
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [joinMode, setJoinMode] = useState<boolean>(false);
+
+  // Listen to see if the current player was kicked from the active room
+  useEffect(() => {
+    if (room && playerId && room.status !== 'FINISHED') {
+      if (!room.players[playerId]) {
+        alert('Has sido expulsado de la sala por el creador.');
+        setRoomId(null);
+      }
+    }
+  }, [room?.players, playerId, setRoomId, room?.status]);
 
   // Check URL search parameters for automatic invite code redirection
   useEffect(() => {
@@ -33,11 +44,11 @@ function GameContent() {
     }
   }, [currentRoomId]);
 
-  const handleCreateRoom = async (settings: RoomSettings) => {
+  const handleCreateRoom = async (settings: RoomSettings, password?: string) => {
     if (!name.trim()) return;
     setIsProcessing(true);
     try {
-      await createRoom(name.trim(), settings, selectedAvatar);
+      await createRoom(name.trim(), settings, selectedAvatar, password);
       setShowSettings(false);
     } catch (err) {
       const errorVal = err as Error;
@@ -52,7 +63,7 @@ function GameContent() {
     if (!name.trim() || !joinCode.trim()) return;
     setIsProcessing(true);
     try {
-      await joinRoom(joinCode.trim(), name.trim(), selectedAvatar);
+      await joinRoom(joinCode.trim(), name.trim(), selectedAvatar, joinPassword.trim() || undefined);
       // Clean up URL if it has query params
       if (window.location.search) {
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -230,6 +241,17 @@ function GameContent() {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="joinPassword">Contraseña de Sala (Si tiene):</label>
+                <input
+                  type="text"
+                  id="joinPassword"
+                  placeholder="Dejar en blanco si no tiene"
+                  value={joinPassword}
+                  onChange={(e) => setJoinPassword(e.target.value)}
                 />
               </div>
               

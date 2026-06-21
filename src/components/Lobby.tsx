@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { Copy, Share2, Crown, AlertCircle } from 'lucide-react';
+import { Copy, Share2, Crown, AlertCircle, UserMinus } from 'lucide-react';
 
 export const Lobby: React.FC = () => {
-  const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom } = useGame();
+  const { room, playerId, toggleReady, startGame, setRoomId, leaveRoom, kickPlayer, transferCreator } = useGame();
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
@@ -108,9 +108,35 @@ export const Lobby: React.FC = () => {
                     {player.name} {player.id === playerId ? ' (Tú)' : ''}
                     {isPlayerCreator && <Crown size={14} className="creator-icon" />}
                   </span>
-                  <span className={`status-badge ${player.isReady ? 'ready' : 'pending'}`}>
-                    {player.isReady ? 'Listo' : 'Esperando...'}
-                  </span>
+                  <div className="player-status-group">
+                    <span className={`status-badge ${player.isReady ? 'ready' : 'pending'}`}>
+                      {player.isReady ? 'Listo' : 'Esperando...'}
+                    </span>
+                    {isCreator && player.id !== playerId && (
+                      <div className="admin-actions">
+                        <button 
+                          className="icon-btn admin-btn" 
+                          title="Hacer Creador" 
+                          onClick={() => handleAction(`crown_${player.id}`, () => transferCreator(player.id))}
+                          disabled={processingAction !== null}
+                        >
+                          {processingAction === `crown_${player.id}` ? <span className="loading-spinner-small"></span> : <Crown size={14} />}
+                        </button>
+                        <button 
+                          className="icon-btn admin-btn danger" 
+                          title="Expulsar Jugador" 
+                          onClick={() => {
+                            if (window.confirm(`¿Expulsar a ${player.name}?`)) {
+                              handleAction(`kick_${player.id}`, () => kickPlayer(player.id));
+                            }
+                          }}
+                          disabled={processingAction !== null}
+                        >
+                          {processingAction === `kick_${player.id}` ? <span className="loading-spinner-small"></span> : <UserMinus size={14} />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

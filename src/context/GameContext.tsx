@@ -11,8 +11,8 @@ interface GameContextType {
   error: string | null;
   currentRoomId: string | null;
   setRoomId: (id: string | null) => void;
-  createRoom: (creatorName: string, settings: RoomSettings, avatar: string) => Promise<string>;
-  joinRoom: (roomId: string, name: string, avatar: string) => Promise<string>;
+  createRoom: (creatorName: string, settings: RoomSettings, avatar: string, password?: string) => Promise<string>;
+  joinRoom: (roomId: string, name: string, avatar: string, password?: string) => Promise<string>;
   toggleReady: () => Promise<void>;
   startGame: () => Promise<void>;
   selectCategory: (type: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante') => Promise<void>;
@@ -23,6 +23,8 @@ interface GameContextType {
   triggerSkill: (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion', targetPlayerId?: string, customText?: string) => Promise<void>;
   giftPoints: (toPlayerId: string, amount: number) => Promise<void>;
   leaveRoom: () => Promise<void>;
+  kickPlayer: (targetId: string) => Promise<void>;
+  transferCreator: (targetId: string) => Promise<void>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -43,14 +45,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const game = useGameRoom(currentRoomId);
 
-  const createRoom = async (creatorName: string, settings: RoomSettings, avatar: string) => {
-    const code = await game.createRoom(creatorName, settings, avatar);
+  const createRoom = async (creatorName: string, settings: RoomSettings, avatar: string, password?: string) => {
+    const code = await game.createRoom(creatorName, settings, avatar, password);
     setRoomId(code);
     return code;
   };
 
-  const joinRoom = async (roomId: string, name: string, avatar: string) => {
-    const code = await game.joinRoom(roomId, name, avatar);
+  const joinRoom = async (roomId: string, name: string, avatar: string, password?: string) => {
+    const code = await game.joinRoom(roomId, name, avatar, password);
     setRoomId(code);
     return code;
   };

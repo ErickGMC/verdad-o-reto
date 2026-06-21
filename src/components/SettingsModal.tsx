@@ -4,13 +4,15 @@ import type { RoomSettings } from '../hooks/useGameRoom';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (settings: RoomSettings) => void;
+  onConfirm: (settings: RoomSettings, password?: string) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [timeLimit, setTimeLimit] = useState<number>(30); // default 30s
   const [hasTimeLimit, setHasTimeLimit] = useState<boolean>(true);
   const [allowGifting, setAllowGifting] = useState<boolean>(true);
+  const [usePassword, setUsePassword] = useState<boolean>(false);
+  const [password, setPassword] = useState<string>('');
   const [skills, setSkills] = useState({
     skipTurn: true,
     changeQuestion: true,
@@ -25,7 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       turnTimeLimit: hasTimeLimit ? timeLimit : 0,
       allowGiftingPoints: allowGifting,
       enabledSkills: skills,
-    });
+    }, usePassword ? password.trim() : undefined);
   };
 
   return (
@@ -59,6 +61,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                   className="number-input"
                 />
                 <span className="helper-text">segundos por turno</span>
+              </div>
+            )}
+          </div>
+
+          {/* Password Settings */}
+          <div className="form-group">
+            <label className="switch-label">
+              <input
+                type="checkbox"
+                checked={usePassword}
+                onChange={(e) => setUsePassword(e.target.checked)}
+              />
+              <span className="switch-text">Proteger sala con contraseña</span>
+            </label>
+            {usePassword && (
+              <div className="time-selector-wrapper" style={{ marginTop: '8px', marginLeft: '28px' }}>
+                <input
+                  type="text"
+                  placeholder="Escribe la contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="number-input"
+                  style={{ width: '100%', maxWidth: '200px' }}
+                  required={usePassword}
+                />
               </div>
             )}
           </div>
