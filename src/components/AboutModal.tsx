@@ -44,9 +44,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 <p className="contact-note" style={{ margin: 0, color: 'var(--text-secondary)' }}>
                   Si te ha gustado, puedes invitarme un café <Coffee size={14} style={{ display: 'inline', marginLeft: '4px' }} />
                 </p>
-                <div className="payment-badges" style={{ marginTop: '12px', justifyContent: 'center' }}>
-                  <span className="payment-badge plin">Plin</span>
-                </div>
               </div>
             </div>
           </div>
