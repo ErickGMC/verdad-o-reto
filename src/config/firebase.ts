@@ -2,6 +2,8 @@ import { initializeApp, getApps } from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
+import type { Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -10,6 +12,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || `https://${import.meta.env.VITE_FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com`
 };
 
 // Check if all essential keys are present
@@ -20,12 +23,14 @@ export const isFirebaseConfigured = !!(
 );
 
 let dbInstance: Firestore | null = null;
+let rtdbInstance: Database | null = null;
 let appInstance: FirebaseApp | null = null;
 
 if (isFirebaseConfigured) {
   try {
     appInstance = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     dbInstance = initializeFirestore(appInstance, { localCache: persistentLocalCache() });
+    rtdbInstance = getDatabase(appInstance);
   } catch (error) {
     console.error("Error initializing Firebase: ", error);
   }
@@ -37,4 +42,5 @@ if (isFirebaseConfigured) {
 }
 
 export const db = dbInstance;
+export const rtdb = rtdbInstance;
 export const app = appInstance;

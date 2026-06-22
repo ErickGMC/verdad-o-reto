@@ -51,15 +51,15 @@ export const GameBoard: React.FC = () => {
       setTimeLeft(remaining);
 
       // Active player triggers auto-submit if time runs out
-      if (remaining === 0 && isMyTurn) {
-        submitResponse();
+      if (remaining === 0 && isMyTurn && !processingAction) {
+        handleAction('submit_response', submitResponse);
       }
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 500);
     return () => clearInterval(interval);
-  }, [startedAt, status, turnTimeLimit, isMyTurn, submitResponse]);
+  }, [startedAt, status, turnTimeLimit, isMyTurn, submitResponse, processingAction]);
 
   if (!room || !room.currentTurn) return null;
 

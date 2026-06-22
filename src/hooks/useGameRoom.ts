@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { db, isFirebaseConfigured } from '../config/firebase';
+import { db, rtdb, isFirebaseConfigured } from '../config/firebase';
 import { getQuestion, preloadQuestions } from '../data/questions';
 import {
-  doc,
-  setDoc,
-  onSnapshot,
-  getDoc,
+  ref,
+  get,
+  onValue,
   runTransaction,
-  serverTimestamp
-} from 'firebase/firestore';
+  serverTimestamp as rtdbServerTimestamp,
+  onDisconnect
+} from 'firebase/database';
 
 export interface Player {
   id: string;
@@ -45,7 +45,7 @@ export interface TurnState {
 
 export interface Room {
   id: string;
-  createdAt: number | any; // Allows serverTimestamp()
+  createdAt: number | any;
   creatorId: string;
   status: 'LOBBY' | 'SELECTING' | 'WAITING_RESPONSE' | 'VOTING' | 'FINISHED';
   settings: RoomSettings;
@@ -55,7 +55,6 @@ export interface Room {
   playerOrder: string[];
   currentTurnIdx: number;
   currentTurn: TurnState | null;
-  // Queued custom questions for players: { [targetPlayerId]: customQuestionText }
   customQueuedQuestions?: {
     [playerId: string]: {
       senderName: string;
@@ -87,8 +86,31 @@ function generatePlayerId(): string {
   return 'p_' + Math.random().toString(36).substr(2, 9);
 }
 
-// BroadcastChannel for syncing tabs when Firebase is not configured
 const mockChannel = typeof window !== 'undefined' ? new BroadcastChannel('verdad_o_reto_sync') : null;
+
+// Helper to sanitize RTDB data (transforms objects with index keys back to arrays)
+function sanitizeRoomData(roomData: any): Room {
+  if (!roomData) return roomData;
+  const sanitized = { ...roomData };
+  
+  if (sanitized.playerOrder && !Array.isArray(sanitized.playerOrder)) {
+    sanitized.playerOrder = Object.values(sanitized.playerOrder);
+  }
+  if (!sanitized.playerOrder) sanitized.playerOrder = [];
+
+  if (sanitized.players) {
+    Object.values(sanitized.players).forEach((p: any) => {
+      if (p.skills && !Array.isArray(p.skills)) p.skills = Object.values(p.skills);
+      if (!p.skills) p.skills = [];
+    });
+  }
+
+  if (sanitized.currentTurn && sanitized.currentTurn.votes && Array.isArray(sanitized.currentTurn.votes)) {
+      // Sometimes an object is converted to array if keys are numeric. Votes uses playerId which are strings, but just in case.
+  }
+  
+  return sanitized as Room;
+}
 
 export function useGameRoom(roomId: string | null) {
   const [room, setRoom] = useState<Room | null>(null);
@@ -97,7 +119,6 @@ export function useGameRoom(roomId: string | null) {
   const [isKicked, setIsKicked] = useState<boolean>(false);
   const isLeavingRef = useRef<boolean>(false);
   
-  // Persist playerId in sessionStorage so it survives page reloads
   const [playerId] = useState<string>(() => {
     const saved = sessionStorage.getItem('vor_player_id');
     if (saved) return saved;
@@ -110,13 +131,11 @@ export function useGameRoom(roomId: string | null) {
     return sessionStorage.getItem('vor_player_name') || '';
   });
 
-  // Track the room state using a ref for real-time listener handlers to avoid stale closures
   const roomRef = useRef<Room | null>(null);
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
 
-  // Save name helper
   const savePlayerName = (name: string) => {
     setPlayerName(name);
     sessionStorage.setItem('vor_player_name', name);
@@ -132,16 +151,21 @@ export function useGameRoom(roomId: string | null) {
     setLoading(true);
     setError(null);
 
-    if (isFirebaseConfigured && db) {
-      // Preload questions once (no onSnapshot listener to save reads)
-      preloadQuestions(db);
+    if (isFirebaseConfigured && rtdb) {
+      if (db) preloadQuestions(db); // Still load questions from Firestore
 
-      // Firebase Mode: Listen to Firestore document updates
-      const docRef = doc(db, 'rooms', roomId);
-      const unsubscribe = onSnapshot(docRef, 
+      const dbRoomRef = ref(rtdb, `rooms/${roomId}`);
+      const playerPresenceRef = ref(rtdb, `rooms/${roomId}/players/${playerId}/isPresent`);
+      
+      // Set up onDisconnect hook
+      onDisconnect(playerPresenceRef).set(false).catch(console.error);
+
+      const unsubscribe = onValue(dbRoomRef, 
         (snapshot) => {
           if (snapshot.exists()) {
-            const newRoom = snapshot.data() as Room;
+            const rawData = snapshot.val();
+            const newRoom = sanitizeRoomData(rawData);
+            
             if (newRoom.players && !newRoom.players[playerId] && !isLeavingRef.current) {
               setIsKicked(true);
             }
@@ -153,7 +177,7 @@ export function useGameRoom(roomId: string | null) {
           setLoading(false);
         },
         (err) => {
-          console.error("Firestore error: ", err);
+          console.error("RTDB error: ", err);
           setError('Error al conectar con la sala.');
           setLoading(false);
         }
@@ -161,9 +185,9 @@ export function useGameRoom(roomId: string | null) {
 
       return () => {
         unsubscribe();
+        onDisconnect(playerPresenceRef).cancel(); // Cancel disconnect hook if leaving gracefully
       };
     } else {
-      // Mock Mode: Read initial room from LocalStorage and listen to BroadcastChannel
       const loadLocalRoom = () => {
         const savedRooms = localStorage.getItem('vor_mock_rooms');
         if (savedRooms) {
@@ -183,7 +207,6 @@ export function useGameRoom(roomId: string | null) {
 
       loadLocalRoom();
 
-      // Listen to tab synchronization broadcasts
       const handleBroadcast = (event: MessageEvent) => {
         const message = event.data;
         if (message && message.roomId === roomId) {
@@ -213,28 +236,25 @@ export function useGameRoom(roomId: string | null) {
   }, [roomId]);
 
   // --- ATOMIC STATE MUTATOR ---
-  // Helper to safely mutate the room state via transactions to avoid race conditions 
-  // when millions of players are playing concurrently.
-  const mutateRoomState = async (updater: (currentRoom: Room) => Room | null | 'DELETE') => {
+  const mutateRoomState = async (updater: (currentRoom: Room) => Room | undefined | 'DELETE') => {
     if (!roomId) return;
     
-    if (isFirebaseConfigured && db) {
-      const docRef = doc(db, 'rooms', roomId);
-      await runTransaction(db, async (transaction) => {
-        const sfDoc = await transaction.get(docRef);
-        if (!sfDoc.exists()) throw new Error("La sala no existe.");
+    if (isFirebaseConfigured && rtdb) {
+      const dbRoomRef = ref(rtdb, `rooms/${roomId}`);
+      await runTransaction(dbRoomRef, (currentData: any) => {
+        if (currentData === null) return currentData; // Abort
         
-        const currentRoom = sfDoc.data() as Room;
+        const currentRoom = sanitizeRoomData(currentData);
         const newRoom = updater(currentRoom);
         
         if (newRoom === 'DELETE') {
-          transaction.delete(docRef);
-        } else if (newRoom) {
-          transaction.set(docRef, newRoom);
+          return null; // Delete node
+        } else if (newRoom === undefined) {
+          return; // Abort
         }
+        return newRoom;
       });
     } else {
-      // Save locally (simulating atomic update by locking to synchronous execution)
       const savedRooms = localStorage.getItem('vor_mock_rooms');
       const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
       const currentRoom = roomsMap[roomId];
@@ -246,12 +266,11 @@ export function useGameRoom(roomId: string | null) {
         delete roomsMap[roomId];
         localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
         setRoom(null);
-      } else if (newRoom) {
+      } else if (newRoom !== undefined) {
         roomsMap[newRoom.id] = newRoom;
         localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
         setRoom(newRoom);
 
-        // Broadcast to other tabs
         if (mockChannel) {
           mockChannel.postMessage({
             type: 'UPDATE',
@@ -265,80 +284,75 @@ export function useGameRoom(roomId: string | null) {
 
   // --- ACTIONS ---
 
-  // 1. Create a Game Room
   const createRoom = async (creatorName: string, settings: RoomSettings, avatar: string, password?: string) => {
     savePlayerName(creatorName);
-
     let code = '';
     let isUnique = false;
     
-    // Collision checker loop for scaling to millions
     while (!isUnique) {
       code = generateRoomCode();
-      if (isFirebaseConfigured && db) {
-        const docRef = doc(db, 'rooms', code);
-        const snapshot = await getDoc(docRef);
-        if (!snapshot.exists()) {
+      const newRoom: Room = {
+        id: code,
+        createdAt: isFirebaseConfigured ? rtdbServerTimestamp() : Date.now(),
+        creatorId: playerId,
+        status: 'LOBBY',
+        settings,
+        players: {
+          [playerId]: {
+            id: playerId,
+            name: creatorName,
+            score: 0,
+            skills: [],
+            isReady: true,
+            isPresent: true,
+            avatar
+          }
+        },
+        playerOrder: [playerId],
+        currentTurnIdx: 0,
+        currentTurn: null,
+        customQueuedQuestions: {},
+        ...(password ? { password } : {})
+      };
+
+      if (isFirebaseConfigured && rtdb) {
+        const dbRoomRef = ref(rtdb, `rooms/${code}`);
+        // Use transaction to ensure code is not overridden by someone else creating it simultaneously
+        const result = await runTransaction(dbRoomRef, (currentData) => {
+          if (currentData === null) {
+            return newRoom; // Node doesn't exist, claim it
+          }
+          return; // Abort, node exists
+        });
+        
+        if (result.committed) {
           isUnique = true;
         }
       } else {
         const savedRooms = localStorage.getItem('vor_mock_rooms');
         const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
         if (!roomsMap[code]) {
+          roomsMap[code] = newRoom;
+          localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
           isUnique = true;
         }
       }
-    }
-
-    const newRoom: Room = {
-      id: code,
-      createdAt: isFirebaseConfigured ? serverTimestamp() : Date.now(),
-      creatorId: playerId,
-      status: 'LOBBY',
-      settings,
-      players: {
-        [playerId]: {
-          id: playerId,
-          name: creatorName,
-          score: 0,
-          skills: [],
-          isReady: true, // Creator is automatically ready
-          isPresent: true,
-          avatar
-        }
-      },
-      playerOrder: [playerId],
-      currentTurnIdx: 0,
-      currentTurn: null,
-      customQueuedQuestions: {},
-      ...(password ? { password } : {})
-    };
-
-    if (isFirebaseConfigured && db) {
-      const docRef = doc(db, 'rooms', code);
-      await setDoc(docRef, newRoom);
-    } else {
-      const savedRooms = localStorage.getItem('vor_mock_rooms');
-      const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
-      roomsMap[code] = newRoom;
-      localStorage.setItem('vor_mock_rooms', JSON.stringify(roomsMap));
     }
     
     return code;
   };
 
-  // 2. Join an Existing Room
   const joinRoom = async (targetRoomId: string, name: string, avatar: string, password?: string) => {
     const cleanedId = targetRoomId.toUpperCase().trim();
     savePlayerName(name);
 
     let fetchedRoom: Room | null = null;
 
-    if (isFirebaseConfigured && db) {
-      const docRef = doc(db, 'rooms', cleanedId);
-      const snapshot = await getDoc(docRef);
+    if (isFirebaseConfigured && rtdb) {
+      const dbRoomRef = ref(rtdb, `rooms/${cleanedId}`);
+      const snapshot = await get(dbRoomRef);
       if (snapshot.exists()) {
-        fetchedRoom = snapshot.data() as Room;
+        fetchedRoom = sanitizeRoomData(snapshot.val());
       }
     } else {
       const savedRooms = localStorage.getItem('vor_mock_rooms');
@@ -349,22 +363,18 @@ export function useGameRoom(roomId: string | null) {
     }
 
     if (!fetchedRoom) {
-      if (!isFirebaseConfigured) {
-        throw new Error('La sala no existe. En Modo Demo Local, asegúrate de estar usando el mismo navegador (pestañas normales, no incógnito) ya que las salas locales se guardan en el LocalStorage y no se comparten entre navegadores o dispositivos.');
-      }
-      throw new Error('La sala no existe o el código es incorrecto.');
+      throw new Error(isFirebaseConfigured ? 'La sala no existe o el código es incorrecto.' : 'La sala no existe. En Modo Demo Local, asegúrate de estar usando el mismo navegador.');
     }
 
     if (fetchedRoom.password && fetchedRoom.password !== password) {
       throw new Error('Contraseña incorrecta para entrar a esta sala.');
     }
 
-    if (isFirebaseConfigured && db) {
-       const docRef = doc(db, 'rooms', cleanedId);
-       await runTransaction(db, async (transaction) => {
-         const sfDoc = await transaction.get(docRef);
-         if (!sfDoc.exists()) throw new Error("La sala no existe.");
-         const r = sfDoc.data() as Room;
+    if (isFirebaseConfigured && rtdb) {
+       const dbRoomRef = ref(rtdb, `rooms/${cleanedId}`);
+       const result = await runTransaction(dbRoomRef, (currentData) => {
+         if (currentData === null) return; 
+         const r = sanitizeRoomData(currentData);
          
          const updatedPlayers = {
             ...r.players,
@@ -382,16 +392,21 @@ export function useGameRoom(roomId: string | null) {
             ? r.playerOrder
             : [...r.playerOrder, playerId];
           
-          transaction.set(docRef, {
+          return {
              ...r,
              players: updatedPlayers,
              playerOrder: updatedOrder
-          });
+          };
        });
+       
+       if (!result.committed) {
+         throw new Error("No se pudo unir a la sala.");
+       }
     } else {
       const savedRooms = localStorage.getItem('vor_mock_rooms');
       const roomsMap = savedRooms ? JSON.parse(savedRooms) : {};
       const r = roomsMap[cleanedId];
+      if(!r) throw new Error("Sala no existe");
       const updatedPlayers = {
         ...r.players,
         [playerId]: {
@@ -420,7 +435,6 @@ export function useGameRoom(roomId: string | null) {
     return cleanedId;
   };
 
-  // 3. Toggle Player Ready State
   const toggleReady = async () => {
     await mutateRoomState((current) => {
       const currentReady = current.players[playerId]?.isReady || false;
@@ -437,10 +451,9 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 4. Start the Game (only creator)
   const startGame = async () => {
     await mutateRoomState((current) => {
-      if (playerId !== current.creatorId) return null;
+      if (playerId !== current.creatorId) return undefined;
       
       const shuffledOrder = [...current.playerOrder].sort(() => Math.random() - 0.5);
       return {
@@ -459,13 +472,10 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 5. Select Truth or Dare category
   const selectCategory = async (type: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante') => {
-    // Generate the question content beforehand to keep the transaction fast and sync
     let questionContent: string;
     let categoryType: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante' | 'custom' = type;
 
-    // We check locally first to see if custom
     const queuedQuestion = room?.customQueuedQuestions?.[playerId];
     if (queuedQuestion) {
       questionContent = `[Pregunta Personalizada Anónima]: ${queuedQuestion.text}`;
@@ -476,8 +486,8 @@ export function useGameRoom(roomId: string | null) {
     }
 
     await mutateRoomState((current) => {
-      if (!current.currentTurn) return null;
-      if (playerId !== current.currentTurn.activePlayerId) return null;
+      if (!current.currentTurn) return undefined;
+      if (playerId !== current.currentTurn.activePlayerId) return undefined;
       
       const updatedQueued = { ...current.customQueuedQuestions };
       if (categoryType === 'custom') {
@@ -498,11 +508,10 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 6. Active Player declares they responded or did the dare
   const submitResponse = async () => {
     await mutateRoomState((current) => {
-      if (!current.currentTurn) return null;
-      if (playerId !== current.currentTurn.activePlayerId) return null;
+      if (!current.currentTurn) return undefined;
+      if (playerId !== current.currentTurn.activePlayerId) return undefined;
 
       return {
         ...current,
@@ -515,11 +524,10 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 7. Players qualify the response (Success / Fail)
   const castVote = async (vote: 'COMPLIED' | 'FAILED') => {
     await mutateRoomState((current) => {
-      if (!current.currentTurn) return null;
-      if (playerId === current.currentTurn.activePlayerId) return null;
+      if (!current.currentTurn) return undefined;
+      if (playerId === current.currentTurn.activePlayerId) return undefined;
 
       const updatedVotes = {
         ...current.currentTurn.votes,
@@ -536,15 +544,15 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 8. Move to the Next Turn (triggered after voting closes)
   const nextTurn = async () => {
     await mutateRoomState((current) => {
-      if (!current.currentTurn) return null;
+      if (!current.currentTurn) return undefined;
 
       const activePlayerId = current.currentTurn.activePlayerId;
       const activePlayer = current.players[activePlayerId];
+      if (!activePlayer) return undefined;
       
-      const votesList = Object.values(current.currentTurn.votes);
+      const votesList = current.currentTurn.votes ? Object.values(current.currentTurn.votes) : [];
       const positiveVotes = votesList.filter(v => v === 'COMPLIED').length;
       
       const totalVoters = current.playerOrder.length - 1;
@@ -587,19 +595,18 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 9. Buy a skill from the shop (Costs dynamically based on skill type)
   const buySkill = async (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge') => {
     await mutateRoomState((current) => {
       const player = current.players[playerId];
       const cost = SKILL_COSTS[skill];
-      if (!player || player.score < cost) return null;
+      if (!player || player.score < cost) return undefined;
 
       const updatedPlayers = {
         ...current.players,
         [playerId]: {
           ...player,
           score: player.score - cost,
-          skills: [...player.skills, skill]
+          skills: [...(player.skills || []), skill]
         }
       };
 
@@ -610,13 +617,11 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 10. Use a skill during turn
   const triggerSkill = async (
     skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge',
     targetPlayerId?: string,
     customText?: string
   ) => {
-    // Generate new question beforehand to avoid doing it inside the transaction
     let newQuestionContent = '';
     if (skill === 'changeQuestion' && room?.currentTurn?.typeSelected && room.currentTurn.typeSelected !== 'custom') {
        const type = room.currentTurn.typeSelected;
@@ -625,10 +630,10 @@ export function useGameRoom(roomId: string | null) {
     }
 
     await mutateRoomState((current) => {
-      if (!current.currentTurn) return null;
+      if (!current.currentTurn) return undefined;
 
       const player = current.players[playerId];
-      if (!player || !player.skills.includes(skill)) return null;
+      if (!player || !(player.skills || []).includes(skill)) return undefined;
 
       const skillIdx = player.skills.indexOf(skill);
       const updatedSkills = [...player.skills];
@@ -664,7 +669,7 @@ export function useGameRoom(roomId: string | null) {
           }
         };
       } else if (skill === 'changeQuestion') {
-        if (!current.currentTurn.typeSelected || current.currentTurn.typeSelected === 'custom') return null;
+        if (!current.currentTurn.typeSelected || current.currentTurn.typeSelected === 'custom') return undefined;
         
         nextState = {
           ...nextState,
@@ -694,7 +699,7 @@ export function useGameRoom(roomId: string | null) {
           currentTurn: {
             ...current.currentTurn,
             activePlayerId: targetPlayerId,
-            startedAt: Date.now(), // Restart timer for the new player
+            startedAt: Date.now(),
             votes: {}
           }
         };
@@ -704,14 +709,13 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 11. Gift points to another player
   const giftPoints = async (toPlayerId: string, amount: number) => {
     await mutateRoomState((current) => {
-      if (!current.settings.allowGiftingPoints) return null;
+      if (!current.settings.allowGiftingPoints) return undefined;
       
       const sender = current.players[playerId];
       const receiver = current.players[toPlayerId];
-      if (!sender || !receiver || sender.score < amount || amount <= 0) return null;
+      if (!sender || !receiver || sender.score < amount || amount <= 0) return undefined;
 
       const updatedPlayers = {
         ...current.players,
@@ -732,20 +736,17 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 12. Leave Room securely
   const leaveRoom = async () => {
     isLeavingRef.current = true;
     await mutateRoomState((current) => {
       const player = current.players[playerId];
-      if (!player) return null; // Already not in the room
+      if (!player) return undefined; 
 
-      // Remove player
       const updatedPlayers = { ...current.players };
       delete updatedPlayers[playerId];
       
       const updatedOrder = current.playerOrder.filter(id => id !== playerId);
 
-      // If room is empty, delete it
       if (updatedOrder.length === 0) {
         return 'DELETE';
       }
@@ -756,19 +757,15 @@ export function useGameRoom(roomId: string | null) {
         playerOrder: updatedOrder
       };
 
-      // Handle Creator leaving
       if (current.creatorId === playerId) {
         nextState.creatorId = updatedOrder[0];
       }
 
-      // If only 1 player remains, abort the game and return to LOBBY
       if (updatedOrder.length <= 1 && current.status !== 'LOBBY') {
         nextState.status = 'LOBBY';
         nextState.currentTurn = null;
       } else {
-        // Handle Active Player leaving
         if (current.currentTurn && current.currentTurn.activePlayerId === playerId && current.status !== 'LOBBY') {
-          // Skip turn to next person
           const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
           const nextPlayerId = updatedOrder[nextIdx];
 
@@ -782,8 +779,7 @@ export function useGameRoom(roomId: string | null) {
             startedAt: Date.now()
           };
         } else if (current.currentTurn && current.status === 'VOTING') {
-          // If a voter leaves during voting, remove their vote if any
-          const updatedVotes = { ...current.currentTurn.votes };
+          const updatedVotes = { ...(current.currentTurn.votes || {}) };
           delete updatedVotes[playerId];
           nextState.currentTurn = {
             ...current.currentTurn,
@@ -796,18 +792,16 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 13. Kick Player (Only Creator)
   const kickPlayer = async (targetPlayerId: string) => {
     await mutateRoomState((current) => {
-      if (current.creatorId !== playerId) return null; // Only creator can kick
-      if (!current.players[targetPlayerId]) return null;
+      if (current.creatorId !== playerId) return undefined;
+      if (!current.players[targetPlayerId]) return undefined;
 
       const updatedPlayers = { ...current.players };
       delete updatedPlayers[targetPlayerId];
       
       const updatedOrder = current.playerOrder.filter(id => id !== targetPlayerId);
 
-      // If room is empty, delete it
       if (updatedOrder.length === 0) {
         return 'DELETE';
       }
@@ -818,12 +812,10 @@ export function useGameRoom(roomId: string | null) {
         playerOrder: updatedOrder
       };
 
-      // If only 1 player remains, abort the game and return to LOBBY
       if (updatedOrder.length <= 1 && current.status !== 'LOBBY') {
         nextState.status = 'LOBBY';
         nextState.currentTurn = null;
       } else {
-        // Handle Active Player leaving
         if (current.currentTurn && current.currentTurn.activePlayerId === targetPlayerId && current.status !== 'LOBBY') {
           const nextIdx = current.currentTurnIdx >= updatedOrder.length ? 0 : current.currentTurnIdx;
           const nextPlayerId = updatedOrder[nextIdx];
@@ -838,7 +830,7 @@ export function useGameRoom(roomId: string | null) {
             startedAt: Date.now()
           };
         } else if (current.currentTurn && current.status === 'VOTING') {
-          const updatedVotes = { ...current.currentTurn.votes };
+          const updatedVotes = { ...(current.currentTurn.votes || {}) };
           delete updatedVotes[targetPlayerId];
           nextState.currentTurn = {
             ...current.currentTurn,
@@ -851,11 +843,10 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 14. Transfer Creator Privilege (Only Creator)
   const transferCreator = async (targetPlayerId: string) => {
     await mutateRoomState((current) => {
-      if (current.creatorId !== playerId) return null;
-      if (!current.players[targetPlayerId]) return null;
+      if (current.creatorId !== playerId) return undefined;
+      if (!current.players[targetPlayerId]) return undefined;
 
       return {
         ...current,
@@ -864,12 +855,11 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 15. Update Player Profile
   const updatePlayerProfile = async (newName: string, newAvatar: string) => {
     savePlayerName(newName);
     await mutateRoomState((current) => {
       const player = current.players[playerId];
-      if (!player) return null;
+      if (!player) return undefined;
 
       const updatedPlayers = {
         ...current.players,
@@ -887,10 +877,9 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
-  // 16. Update Room Settings (Only Creator)
   const updateRoomSettings = async (newSettings: RoomSettings, newPassword?: string) => {
     await mutateRoomState((current) => {
-      if (current.creatorId !== playerId) return null;
+      if (current.creatorId !== playerId) return undefined;
 
       return {
         ...current,
@@ -903,7 +892,7 @@ export function useGameRoom(roomId: string | null) {
   return {
     room,
     currentRoomId: room?.id || null,
-    setRoomId: () => {}, // Handled differently now, maybe need to add if missing or check GameContext
+    setRoomId: () => {}, 
     playerId,
     playerName,
     loading,
