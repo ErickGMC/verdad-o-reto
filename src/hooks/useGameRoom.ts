@@ -242,7 +242,7 @@ export function useGameRoom(roomId: string | null) {
     if (isFirebaseConfigured && rtdb) {
       const dbRoomRef = ref(rtdb, `rooms/${roomId}`);
       await runTransaction(dbRoomRef, (currentData: any) => {
-        if (currentData === null) return currentData; // Abort
+        if (currentData === null) return; // Abort safely instead of returning currentData (which deletes node)
         
         const currentRoom = sanitizeRoomData(currentData);
         const newRoom = updater(currentRoom);
@@ -373,8 +373,12 @@ export function useGameRoom(roomId: string | null) {
     if (isFirebaseConfigured && rtdb) {
        const dbRoomRef = ref(rtdb, `rooms/${cleanedId}`);
        const result = await runTransaction(dbRoomRef, (currentData) => {
-         if (currentData === null) return; 
-         const r = sanitizeRoomData(currentData);
+         // Si currentData es null (por caché local vacío), intentamos enviar la data obtenida por get() 
+         // para que el servidor evalúe y rechace si hubo cambio, recargando currentData.
+         const baseData = currentData === null ? fetchedRoom : currentData;
+         if (!baseData) return; 
+         
+         const r = sanitizeRoomData(baseData);
          
          const updatedPlayers = {
             ...r.players,

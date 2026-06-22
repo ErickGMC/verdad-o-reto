@@ -1664,3 +1664,72 @@
 .password-group label { color: var(--neon-purple) !important; font-size: 13px !important; opacity: 0.9; }
 .input-room-password { font-size: 14px !important; font-family: monospace !important; letter-spacing: 1px !important; padding: 10px 14px !important; border: 1px solid rgba(168, 85, 247, 0.3) !important; border-radius: 8px; background: rgba(0, 0, 0, 0.1) !important; }
 .input-room-password:focus { border-color: var(--neon-purple) !important; box-shadow: 0 0 10px rgba(168, 85, 247, 0.3) !important; }
+
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+  .game-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .lobby-codes-panel {
+    grid-template-columns: 1fr;
+  }
+  .picker-grid {
+    grid-template-columns: 1fr;
+  }
+  .voters-grid {
+    grid-template-columns: 1fr;
+  }
+  .skills-buy-grid {
+    grid-template-columns: 1fr;
+  }
+  .avatar-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .main-content {
+    padding: 16px 12px;
+  }
+  .welcome-card {
+    padding: 24px;
+  }
+  .lobby-card {
+    padding: 24px;
+  }
+  .header-brand h2 {
+    font-size: 16px;
+  }
+  .challenge-area {
+    padding: 24px 16px;
+  }
+  .challenge-text {
+    font-size: 20px;
+  }
+  .turn-banner {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  .vote-buttons {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .avatar-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .settings-chips {
+    flex-direction: column;
+  }
+  .player-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .player-status-group {
+    width: 100%;
+    justify-content: space-between;
+    display: flex;
+  }
+}
