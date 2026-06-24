@@ -25,6 +25,7 @@ interface GameContextType {
   giftPoints: (toPlayerId: string, amount: number) => Promise<void>;
   leaveRoom: () => Promise<void>;
   kickPlayer: (targetId: string) => Promise<void>;
+  finishGame: () => Promise<void>;
   transferCreator: (targetId: string) => Promise<void>;
   updatePlayerProfile: (name: string, avatar: string) => Promise<void>;
   updateRoomSettings: (settings: RoomSettings, password?: string) => Promise<void>;

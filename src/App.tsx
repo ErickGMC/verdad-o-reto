@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
-import { Lobby } from './components/Lobby';
-import { GameBoard } from './components/GameBoard';
-import { SkillShop } from './components/SkillShop';
-import { SettingsModal } from './components/SettingsModal';
-import { AboutModal } from './components/AboutModal';
-import { InstructionsModal } from './components/InstructionsModal';
 import { AlertProvider, useAlert } from './context/AlertContext';
 import { isFirebaseConfigured } from './config/firebase';
 import { LogOut } from 'lucide-react';
 import type { RoomSettings } from './hooks/useGameRoom';
+import './App.css';
+
+const Lobby = lazy(() => import('./components/Lobby').then(m => ({ default: m.Lobby })));
+const GameBoard = lazy(() => import('./components/GameBoard').then(m => ({ default: m.GameBoard })));
+const SkillShop = lazy(() => import('./components/SkillShop').then(m => ({ default: m.SkillShop })));
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const AboutModal = lazy(() => import('./components/AboutModal').then(m => ({ default: m.AboutModal })));
+const InstructionsModal = lazy(() => import('./components/InstructionsModal').then(m => ({ default: m.InstructionsModal })));
 import './App.css';
 
 const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
@@ -17,7 +19,7 @@ const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁',
 function GameContent() {
   const { room, currentRoomId, setRoomId, createRoom, joinRoom, leaveRoom, loading, error, isKicked } = useGame();
   const { showAlert } = useAlert();
-  const [name, setName] = useState<string>(() => sessionStorage.getItem('vor_player_name') || '');
+  const [name, setName] = useState<string>(() => localStorage.getItem('vor_player_name') || '');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🦊');
   const [joinCode, setJoinCode] = useState<string>('');
   const [joinPassword, setJoinPassword] = useState<string>('');
@@ -67,7 +69,7 @@ function GameContent() {
     if (!name.trim() || !joinCode.trim()) return;
     setIsProcessing(true);
     try {
-      await joinRoom(joinCode.trim(), name.trim(), selectedAvatar, joinPassword.trim() || undefined);
+      await joinRoom(joinCode.trim().toUpperCase(), name.trim(), selectedAvatar, joinPassword.trim() || undefined);
       // Clean up URL if it has query params
       if (window.location.search) {
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -119,11 +121,10 @@ function GameContent() {
         </header>
 
         <main className="main-content flex-grow">
-          {/* Active play board */}
-          <GameBoard />
-          
-          {/* Skill shop underneath */}
-          <SkillShop />
+          <Suspense fallback={<div className="loading-spinner"></div>}>
+            <GameBoard />
+            <SkillShop />
+          </Suspense>
         </main>
       </div>
     );
@@ -143,7 +144,9 @@ function GameContent() {
           </span>
         </header>
         <main className="main-content flex-grow">
-          <Lobby />
+          <Suspense fallback={<div className="loading-spinner"></div>}>
+            <Lobby />
+          </Suspense>
         </main>
       </div>
     );
@@ -235,7 +238,7 @@ function GameContent() {
                   placeholder="Ej: FR8A7X"
                   maxLength={6}
                   value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setJoinCode(e.target.value)}
                   required
                 />
               </div>
@@ -284,22 +287,23 @@ function GameContent() {
         </div>
       </div>
 
-      {/* Settings Modal popup */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        onConfirm={handleCreateRoom}
-      />
+      <Suspense fallback={<div className="loading-spinner" />}>
+        <SettingsModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          onConfirm={handleCreateRoom}
+        />
 
-      <AboutModal
-        isOpen={showAbout}
-        onClose={() => setShowAbout(false)}
-      />
+        <AboutModal
+          isOpen={showAbout}
+          onClose={() => setShowAbout(false)}
+        />
 
-      <InstructionsModal
-        isOpen={showInstructions}
-        onClose={() => setShowInstructions(false)}
-      />
+        <InstructionsModal
+          isOpen={showInstructions}
+          onClose={() => setShowInstructions(false)}
+        />
+      </Suspense>
     </div>
   );
 }

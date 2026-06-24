@@ -3,6 +3,7 @@ import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
 import { Copy, Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
+import type { RoomSettings } from '../hooks/useGameRoom';
 
 export const Lobby: React.FC = () => {
   const { room, playerId, toggleReady, startGame, leaveRoom, kickPlayer, transferCreator, updatePlayerProfile, updateRoomSettings } = useGame();
@@ -47,7 +48,7 @@ export const Lobby: React.FC = () => {
     setIsEditingProfile(false);
   };
 
-  const handleUpdateSettings = async (settings: any, password?: string) => {
+  const handleUpdateSettings = async (settings: RoomSettings, password?: string) => {
     await handleAction('update_settings', () => updateRoomSettings(settings, password));
     setShowSettings(false);
   };

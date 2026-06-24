@@ -95,6 +95,11 @@ export const ALL_QUESTIONS: QuestionItem[] = [
   ...DARES_PICANTE.map((text, i) => ({ id: `dp_${i}`, text, type: 'dare' as const, level: 'picante' as const })),
 ];
 
+export function generateDeck(type: 'truth' | 'dare', level: 'leve' | 'picante'): string[] {
+  const ids = ALL_QUESTIONS.filter(q => q.type === type && q.level === level).map(q => q.id);
+  return ids.sort(() => Math.random() - 0.5);
+}
+
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 
@@ -162,5 +167,10 @@ export async function getQuestion(
   }
 
   return getRandomItem(type, level);
+}
+
+export function getQuestionByIdSync(id: string): string {
+  const q = cachedFirestoreQuestions.find(x => x.id === id) || ALL_QUESTIONS.find(x => x.id === id);
+  return q ? q.text : "Pregunta o reto no encontrado";
 }
 

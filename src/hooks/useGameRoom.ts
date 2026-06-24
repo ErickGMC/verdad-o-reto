@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { db, rtdb, isFirebaseConfigured } from '../config/firebase';
-import { getQuestion, preloadQuestions } from '../data/questions';
+import { preloadQuestions, generateDeck, getQuestionByIdSync } from '../data/questions';
 import {
   ref,
   get,
   onValue,
   runTransaction,
   serverTimestamp as rtdbServerTimestamp,
-  onDisconnect
+  onDisconnect,
+  set
 } from 'firebase/database';
 
 export interface Player {
@@ -45,7 +46,7 @@ export interface TurnState {
 
 export interface Room {
   id: string;
-  createdAt: number | any;
+  createdAt: number | object;
   creatorId: string;
   status: 'LOBBY' | 'SELECTING' | 'WAITING_RESPONSE' | 'VOTING' | 'FINISHED';
   settings: RoomSettings;
@@ -60,6 +61,12 @@ export interface Room {
       senderName: string;
       text: string;
     };
+  };
+  decks?: {
+    truth_leve: string[];
+    truth_picante: string[];
+    dare_leve: string[];
+    dare_picante: string[];
   };
   password?: string;
 }
@@ -89,9 +96,9 @@ function generatePlayerId(): string {
 const mockChannel = typeof window !== 'undefined' ? new BroadcastChannel('verdad_o_reto_sync') : null;
 
 // Helper to sanitize RTDB data (transforms objects with index keys back to arrays)
-function sanitizeRoomData(roomData: any): Room {
-  if (!roomData) return roomData;
-  const sanitized = { ...roomData };
+function sanitizeRoomData(roomData: Record<string, unknown>): Room {
+  if (!roomData) return roomData as unknown as Room;
+  const sanitized = { ...roomData } as any;
   
   if (sanitized.playerOrder && !Array.isArray(sanitized.playerOrder)) {
     sanitized.playerOrder = Object.values(sanitized.playerOrder);
@@ -105,10 +112,19 @@ function sanitizeRoomData(roomData: any): Room {
     });
   }
 
-  if (sanitized.currentTurn && sanitized.currentTurn.votes && Array.isArray(sanitized.currentTurn.votes)) {
+  if (sanitized.currentTurn) {
       // Sometimes an object is converted to array if keys are numeric. Votes uses playerId which are strings, but just in case.
   }
   
+  if (sanitized.decks) {
+    Object.keys(sanitized.decks).forEach((key) => {
+      const deckKey = key as keyof typeof sanitized.decks;
+      if (sanitized.decks[deckKey] && !Array.isArray(sanitized.decks[deckKey])) {
+         sanitized.decks[deckKey] = Object.values(sanitized.decks[deckKey]);
+      }
+    });
+  }
+
   return sanitized as Room;
 }
 
@@ -120,15 +136,15 @@ export function useGameRoom(roomId: string | null) {
   const isLeavingRef = useRef<boolean>(false);
   
   const [playerId] = useState<string>(() => {
-    const saved = sessionStorage.getItem('vor_player_id');
+    const saved = localStorage.getItem('vor_player_id');
     if (saved) return saved;
     const newId = generatePlayerId();
-    sessionStorage.setItem('vor_player_id', newId);
+    localStorage.setItem('vor_player_id', newId);
     return newId;
   });
 
   const [playerName, setPlayerName] = useState<string>(() => {
-    return sessionStorage.getItem('vor_player_name') || '';
+    return localStorage.getItem('vor_player_name') || '';
   });
 
   const roomRef = useRef<Room | null>(null);
@@ -138,17 +154,22 @@ export function useGameRoom(roomId: string | null) {
 
   const savePlayerName = (name: string) => {
     setPlayerName(name);
-    sessionStorage.setItem('vor_player_name', name);
+    localStorage.setItem('vor_player_name', name);
   };
 
   // --- REAL-TIME LISTENER ---
   useEffect(() => {
     if (!roomId) {
-      setRoom(null);
+      if (roomRef.current !== null) {
+        // Prevent synchronous state update during render loop
+        queueMicrotask(() => setRoom(null));
+      }
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
 
     if (isFirebaseConfigured && rtdb) {
@@ -163,7 +184,7 @@ export function useGameRoom(roomId: string | null) {
       const unsubscribe = onValue(dbRoomRef, 
         (snapshot) => {
           if (snapshot.exists()) {
-            const rawData = snapshot.val();
+            const rawData = snapshot.val() as Record<string, unknown>;
             const newRoom = sanitizeRoomData(rawData);
             
             if (newRoom.players && !newRoom.players[playerId] && !isLeavingRef.current) {
@@ -233,7 +254,7 @@ export function useGameRoom(roomId: string | null) {
         }
       };
     }
-  }, [roomId]);
+  }, [roomId, playerId]); // removed room from dependency to prevent infinite loop
 
   // --- ATOMIC STATE MUTATOR ---
   const mutateRoomState = async (updater: (currentRoom: Room) => Room | undefined | 'DELETE') => {
@@ -241,10 +262,10 @@ export function useGameRoom(roomId: string | null) {
     
     if (isFirebaseConfigured && rtdb) {
       const dbRoomRef = ref(rtdb, `rooms/${roomId}`);
-      await runTransaction(dbRoomRef, (currentData: any) => {
+      await runTransaction(dbRoomRef, (currentData: unknown) => {
         if (currentData === null) return; // Abort safely instead of returning currentData (which deletes node)
         
-        const currentRoom = sanitizeRoomData(currentData);
+        const currentRoom = sanitizeRoomData(currentData as Record<string, unknown>);
         const newRoom = updater(currentRoom);
         
         if (newRoom === 'DELETE') {
@@ -312,6 +333,12 @@ export function useGameRoom(roomId: string | null) {
         currentTurnIdx: 0,
         currentTurn: null,
         customQueuedQuestions: {},
+        decks: {
+          truth_leve: generateDeck('truth', 'leve'),
+          truth_picante: generateDeck('truth', 'picante'),
+          dare_leve: generateDeck('dare', 'leve'),
+          dare_picante: generateDeck('dare', 'picante'),
+        },
         ...(password ? { password } : {})
       };
 
@@ -440,19 +467,25 @@ export function useGameRoom(roomId: string | null) {
   };
 
   const toggleReady = async () => {
-    await mutateRoomState((current) => {
-      const currentReady = current.players[playerId]?.isReady || false;
-      return {
-        ...current,
-        players: {
-          ...current.players,
-          [playerId]: {
-            ...current.players[playerId],
-            isReady: !currentReady
+    if (isFirebaseConfigured && rtdb && room) {
+      const currentReady = room.players[playerId]?.isReady || false;
+      const readyRef = ref(rtdb, `rooms/${roomId}/players/${playerId}/isReady`);
+      await set(readyRef, !currentReady);
+    } else {
+      await mutateRoomState((current) => {
+        const currentReady = current.players[playerId]?.isReady || false;
+        return {
+          ...current,
+          players: {
+            ...current.players,
+            [playerId]: {
+              ...current.players[playerId],
+              isReady: !currentReady
+            }
           }
-        }
-      };
-    });
+        };
+      });
+    }
   };
 
   const startGame = async () => {
@@ -477,16 +510,13 @@ export function useGameRoom(roomId: string | null) {
   };
 
   const selectCategory = async (type: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante') => {
-    let questionContent: string;
+    let questionContent: string = '';
     let categoryType: 'truth_leve' | 'truth_picante' | 'dare_leve' | 'dare_picante' | 'custom' = type;
 
     const queuedQuestion = room?.customQueuedQuestions?.[playerId];
     if (queuedQuestion) {
       questionContent = `[Pregunta Personalizada Anónima]: ${queuedQuestion.text}`;
       categoryType = 'custom';
-    } else {
-      const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
-      questionContent = await getQuestion(db, action, level);
     }
 
     await mutateRoomState((current) => {
@@ -498,10 +528,33 @@ export function useGameRoom(roomId: string | null) {
          delete updatedQueued[playerId];
       }
 
+      let updatedDecks = current.decks || {
+        truth_leve: generateDeck('truth', 'leve'),
+        truth_picante: generateDeck('truth', 'picante'),
+        dare_leve: generateDeck('dare', 'leve'),
+        dare_picante: generateDeck('dare', 'picante'),
+      };
+
+      if (categoryType !== 'custom') {
+        const deckKey = categoryType as keyof typeof updatedDecks;
+        let deck = updatedDecks[deckKey] || [];
+        if (deck.length === 0) {
+            const [action, level] = categoryType.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
+            deck = generateDeck(action, level);
+        }
+        const selectedId = deck[0];
+        updatedDecks = {
+            ...updatedDecks,
+            [deckKey]: deck.slice(1)
+        };
+        questionContent = getQuestionByIdSync(selectedId);
+      }
+
       return {
         ...current,
         status: 'WAITING_RESPONSE',
         customQueuedQuestions: updatedQueued,
+        decks: updatedDecks,
         currentTurn: {
           ...current.currentTurn,
           typeSelected: categoryType,
@@ -529,23 +582,29 @@ export function useGameRoom(roomId: string | null) {
   };
 
   const castVote = async (vote: 'COMPLIED' | 'FAILED') => {
-    await mutateRoomState((current) => {
-      if (!current.currentTurn) return undefined;
-      if (playerId === current.currentTurn.activePlayerId) return undefined;
+    if (isFirebaseConfigured && rtdb && room) {
+      if (!room.currentTurn || playerId === room.currentTurn.activePlayerId) return;
+      const voteRef = ref(rtdb, `rooms/${roomId}/currentTurn/votes/${playerId}`);
+      await set(voteRef, vote);
+    } else {
+      await mutateRoomState((current) => {
+        if (!current.currentTurn) return undefined;
+        if (playerId === current.currentTurn.activePlayerId) return undefined;
 
-      const updatedVotes = {
-        ...current.currentTurn.votes,
-        [playerId]: vote
-      };
+        const updatedVotes = {
+          ...current.currentTurn.votes,
+          [playerId]: vote
+        };
 
-      return {
-        ...current,
-        currentTurn: {
-          ...current.currentTurn,
-          votes: updatedVotes
-        }
-      };
-    });
+        return {
+          ...current,
+          currentTurn: {
+            ...current.currentTurn,
+            votes: updatedVotes
+          }
+        };
+      });
+    }
   };
 
   const nextTurn = async () => {
@@ -600,25 +659,43 @@ export function useGameRoom(roomId: string | null) {
   };
 
   const buySkill = async (skill: 'skipTurn' | 'changeQuestion' | 'customTargetQuestion' | 'transferChallenge') => {
-    await mutateRoomState((current) => {
-      const player = current.players[playerId];
+    if (isFirebaseConfigured && rtdb && room) {
       const cost = SKILL_COSTS[skill];
-      if (!player || player.score < cost) return undefined;
+      const playerRef = ref(rtdb, `rooms/${roomId}/players/${playerId}`);
+      await runTransaction(playerRef, (player: Record<string, unknown> | null) => {
+        if (!player || typeof player.score !== 'number' || player.score < cost) return; // abort
+        
+        let skills = player.skills;
+        if (skills && !Array.isArray(skills)) skills = Object.values(skills);
+        if (!skills) skills = [];
 
-      const updatedPlayers = {
-        ...current.players,
-        [playerId]: {
+        return {
           ...player,
           score: player.score - cost,
-          skills: [...(player.skills || []), skill]
-        }
-      };
+          skills: [...(skills as string[]), skill]
+        };
+      });
+    } else {
+      await mutateRoomState((current) => {
+        const player = current.players[playerId];
+        const cost = SKILL_COSTS[skill];
+        if (!player || player.score < cost) return undefined;
 
-      return {
-        ...current,
-        players: updatedPlayers
-      };
-    });
+        const updatedPlayers = {
+          ...current.players,
+          [playerId]: {
+            ...player,
+            score: player.score - cost,
+            skills: [...(player.skills || []), skill]
+          }
+        };
+
+        return {
+          ...current,
+          players: updatedPlayers
+        };
+      });
+    }
   };
 
   const triggerSkill = async (
@@ -626,13 +703,6 @@ export function useGameRoom(roomId: string | null) {
     targetPlayerId?: string,
     customText?: string
   ) => {
-    let newQuestionContent = '';
-    if (skill === 'changeQuestion' && room?.currentTurn?.typeSelected && room.currentTurn.typeSelected !== 'custom') {
-       const type = room.currentTurn.typeSelected;
-       const [action, level] = type.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
-       newQuestionContent = await getQuestion(db, action, level);
-    }
-
     await mutateRoomState((current) => {
       if (!current.currentTurn) return undefined;
 
@@ -651,7 +721,7 @@ export function useGameRoom(roomId: string | null) {
         }
       };
 
-      let nextState: Room = {
+      const nextState: Room = {
         ...current,
         players: updatedPlayers
       };
@@ -660,7 +730,7 @@ export function useGameRoom(roomId: string | null) {
         const nextIdx = (current.currentTurnIdx + 1) % current.playerOrder.length;
         const nextPlayerId = current.playerOrder[nextIdx];
         
-        nextState = {
+        const nextStateSkip = {
           ...nextState,
           status: 'SELECTING',
           currentTurnIdx: nextIdx,
@@ -671,34 +741,61 @@ export function useGameRoom(roomId: string | null) {
             votes: {},
             startedAt: Date.now()
           }
-        };
+        } as Room;
+        return nextStateSkip;
       } else if (skill === 'changeQuestion') {
         if (!current.currentTurn.typeSelected || current.currentTurn.typeSelected === 'custom') return undefined;
         
-        nextState = {
+        const categoryType = current.currentTurn.typeSelected;
+        let updatedDecks = nextState.decks || {
+          truth_leve: generateDeck('truth', 'leve'),
+          truth_picante: generateDeck('truth', 'picante'),
+          dare_leve: generateDeck('dare', 'leve'),
+          dare_picante: generateDeck('dare', 'picante'),
+        };
+
+        const deckKey = categoryType as keyof typeof updatedDecks;
+        let deck = updatedDecks[deckKey] || [];
+        if (deck.length === 0) {
+            const [action, level] = categoryType.split('_') as ['truth' | 'dare', 'leve' | 'picante'];
+            deck = generateDeck(action, level);
+        }
+        const selectedId = deck[0];
+        updatedDecks = {
+            ...updatedDecks,
+            [deckKey]: deck.slice(1)
+        };
+        const newContent = getQuestionByIdSync(selectedId);
+
+        const nextStateChange = {
           ...nextState,
+          decks: updatedDecks,
           currentTurn: {
             ...current.currentTurn,
-            content: newQuestionContent,
+            content: newContent,
             votes: {},
             startedAt: Date.now()
           }
-        };
+        } as Room;
+        return nextStateChange;
       } else if (skill === 'customTargetQuestion' && targetPlayerId && customText) {
         const updatedQueued = {
           ...current.customQueuedQuestions,
           [targetPlayerId]: {
             senderName: 'Anónimo',
-            text: customText
+            text: current.customQueuedQuestions?.[targetPlayerId] 
+              ? `${current.customQueuedQuestions[targetPlayerId].text} | ADEMÁS: ${customText}`
+              : customText
           }
         };
 
-        nextState = {
+        const nextStateCopy3 = {
           ...nextState,
           customQueuedQuestions: updatedQueued
         };
+        return nextStateCopy3;
       } else if (skill === 'transferChallenge' && targetPlayerId) {
-        nextState = {
+        const nextStateTransfer = {
           ...nextState,
           currentTurn: {
             ...current.currentTurn,
@@ -706,7 +803,8 @@ export function useGameRoom(roomId: string | null) {
             startedAt: Date.now(),
             votes: {}
           }
-        };
+        } as Room;
+        return nextStateTransfer;
       }
 
       return nextState;
@@ -755,7 +853,7 @@ export function useGameRoom(roomId: string | null) {
         return 'DELETE';
       }
 
-      let nextState: Room = {
+      const nextState: Room = {
         ...current,
         players: updatedPlayers,
         playerOrder: updatedOrder
@@ -796,6 +894,17 @@ export function useGameRoom(roomId: string | null) {
     });
   };
 
+  const finishGame = async () => {
+    await mutateRoomState((current) => {
+      if (current.creatorId !== playerId) return undefined;
+      return {
+        ...current,
+        status: 'FINISHED',
+        currentTurn: null
+      };
+    });
+  };
+
   const kickPlayer = async (targetPlayerId: string) => {
     await mutateRoomState((current) => {
       if (current.creatorId !== playerId) return undefined;
@@ -810,7 +919,7 @@ export function useGameRoom(roomId: string | null) {
         return 'DELETE';
       }
 
-      let nextState: Room = {
+      const nextState: Room = {
         ...current,
         players: updatedPlayers,
         playerOrder: updatedOrder
@@ -915,6 +1024,7 @@ export function useGameRoom(roomId: string | null) {
     giftPoints,
     leaveRoom,
     kickPlayer,
+    finishGame,
     transferCreator,
     updatePlayerProfile,
     updateRoomSettings,

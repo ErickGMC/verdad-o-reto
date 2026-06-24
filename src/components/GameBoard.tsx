@@ -14,6 +14,7 @@ export const GameBoard: React.FC = () => {
     giftPoints,
     kickPlayer,
     transferCreator,
+    finishGame,
   } = useGame();
   const { showConfirm } = useAlert();
 
@@ -61,11 +62,19 @@ export const GameBoard: React.FC = () => {
     return () => clearInterval(interval);
   }, [startedAt, status, turnTimeLimit, isMyTurn, submitResponse, processingAction]);
 
+  const me = room?.players?.[playerId];
+  
+  useEffect(() => {
+    if (me && giftAmount > 0 && me.score < giftAmount) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setGiftAmount(Math.max(1, me.score));
+    }
+  }, [me?.score, giftAmount, me]);
+
   if (!room || !room.currentTurn) return null;
 
   const activePlayer = room.players[room.currentTurn.activePlayerId];
   const playersList = Object.values(room.players);
-  const me = room.players[playerId];
 
   // Count voters
   const totalVoters = room.playerOrder.length - 1;
@@ -80,11 +89,49 @@ export const GameBoard: React.FC = () => {
   // Points gift submit handler
   const handleGiftPoints = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!giftTargetId || giftAmount <= 0) return;
-    handleAction('gift', () => giftPoints(giftTargetId, giftAmount)).then(() => {
+    if (!me) return;
+    const finalAmount = Math.min(giftAmount, me.score);
+    if (!giftTargetId || finalAmount <= 0) return;
+    handleAction('gift', () => giftPoints(giftTargetId, finalAmount)).then(() => {
       setShowGiftForm(false);
     });
   };
+
+  if (status === 'FINISHED') {
+    const sortedPlayers = [...playersList].sort((a, b) => b.score - a.score);
+    const winner = sortedPlayers[0];
+
+    return (
+      <div className="game-grid page-fade-in">
+        <div className="active-play-area" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <div className="selection-area glass-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <h2>🎉 ¡Partida Finalizada! 🎉</h2>
+            <div style={{ fontSize: '64px', margin: '20px 0' }}>{winner?.avatar}</div>
+            <h3>{winner?.name} es el Ganador</h3>
+            <p style={{ color: 'var(--text-secondary)' }}>con {winner?.score} puntos</p>
+          </div>
+        </div>
+        <div className="scoreboard-area">
+          <div className="leaderboard-card glass-card">
+            <div className="board-header">
+              <Trophy className="trophy-icon" />
+              <h3>Posiciones Finales</h3>
+            </div>
+            <div className="standings-list">
+              {sortedPlayers.map((p, idx) => (
+                 <div key={p.id} className={`standing-row ${p.id === playerId ? 'me' : ''}`}>
+                    <span className="rank-num">#{idx + 1}</span>
+                    <span className="avatar">{p.avatar}</span>
+                    <span className="name">{p.name}</span>
+                    <span className="score"><strong>{p.score}</strong> pts</span>
+                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="game-grid page-fade-in">
@@ -271,9 +318,21 @@ export const GameBoard: React.FC = () => {
       <div className="scoreboard-area">
         {/* Player Leaderboard */}
         <div className="leaderboard-card glass-card">
-          <div className="board-header">
-            <Trophy className="trophy-icon" />
-            <h3>Turnos por Venir</h3>
+          <div className="board-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Trophy className="trophy-icon" />
+              <h3>Turnos por Venir</h3>
+            </div>
+            {playerId === room.creatorId && (
+              <button 
+                onClick={() => showConfirm('¿Terminar la partida y ver los resultados finales?', () => handleAction('finish_game', finishGame), 'Finalizar Partida')}
+                disabled={processingAction !== null}
+                className="cta-button danger"
+                style={{ padding: '4px 8px', fontSize: '12px', minWidth: 'auto' }}
+              >
+                Terminar
+              </button>
+            )}
           </div>
           <div className="standings-list">
             {playersList

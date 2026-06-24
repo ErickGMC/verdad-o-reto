@@ -1338,6 +1338,14 @@
 }
 
 /* --- BUTTONS SYSTEM --- */
+.input-room-code {
+  font-family: monospace;
+  font-size: 1.2rem;
+  letter-spacing: 0.2rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .cta-button {
   display: inline-flex;
   align-items: center;
