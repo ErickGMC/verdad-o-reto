@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
 import { Gift, Check, X, Timer, Trophy, Crown, UserMinus } from 'lucide-react';
@@ -24,7 +24,7 @@ export const GameBoard: React.FC = () => {
   const [showGiftForm, setShowGiftForm] = useState<boolean>(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
 
-  const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
+  const handleAction = useCallback(async (actionId: string, actionFn: () => Promise<void>) => {
     if (processingAction) return;
     setProcessingAction(actionId);
     try {
@@ -32,7 +32,7 @@ export const GameBoard: React.FC = () => {
     } finally {
       setProcessingAction(null);
     }
-  };
+  }, [processingAction]);
 
   const isMyTurn = room?.currentTurn?.activePlayerId === playerId;
   const status = room?.status;
@@ -60,7 +60,7 @@ export const GameBoard: React.FC = () => {
     updateTimer();
     const interval = setInterval(updateTimer, 500);
     return () => clearInterval(interval);
-  }, [startedAt, status, turnTimeLimit, isMyTurn, submitResponse, processingAction]);
+  }, [startedAt, status, turnTimeLimit, isMyTurn, submitResponse, processingAction, handleAction]);
 
   const me = room?.players?.[playerId];
   

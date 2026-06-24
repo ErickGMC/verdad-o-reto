@@ -98,7 +98,7 @@ const mockChannel = typeof window !== 'undefined' ? new BroadcastChannel('verdad
 // Helper to sanitize RTDB data (transforms objects with index keys back to arrays)
 function sanitizeRoomData(roomData: Record<string, unknown>): Room {
   if (!roomData) return roomData as unknown as Room;
-  const sanitized = { ...roomData } as any;
+  const sanitized = { ...roomData } as Record<string, unknown>;
   
   if (sanitized.playerOrder && !Array.isArray(sanitized.playerOrder)) {
     sanitized.playerOrder = Object.values(sanitized.playerOrder);
@@ -106,9 +106,10 @@ function sanitizeRoomData(roomData: Record<string, unknown>): Room {
   if (!sanitized.playerOrder) sanitized.playerOrder = [];
 
   if (sanitized.players) {
-    Object.values(sanitized.players).forEach((p: any) => {
-      if (p.skills && !Array.isArray(p.skills)) p.skills = Object.values(p.skills);
-      if (!p.skills) p.skills = [];
+    Object.values(sanitized.players).forEach((p: unknown) => {
+      const player = p as Record<string, unknown>;
+      if (player.skills && !Array.isArray(player.skills)) player.skills = Object.values(player.skills);
+      if (!player.skills) player.skills = [];
     });
   }
 
