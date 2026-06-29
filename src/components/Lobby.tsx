@@ -9,7 +9,7 @@ export const Lobby: React.FC = () => {
   const { room, playerId, toggleReady, startGame, leaveRoom, kickPlayer, transferCreator, updatePlayerProfile, updateRoomSettings } = useGame();
   const { showConfirm } = useAlert();
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+
   const [processingAction, setProcessingAction] = useState<string | null>(null);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
