@@ -60,14 +60,40 @@ export const Lobby: React.FC = () => {
 
   const canStart = isCreator && playersList.length >= 2 && allOtherPlayersReady;
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(room.id);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
+  const shareOrCopyCode = async () => {
+    const fallbackCopy = () => {
+      navigator.clipboard.writeText(room.id);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Código de Verdad o Reto',
+          text: `El código de mi sala en Verdad o Reto es: ${room.id}`,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          fallbackCopy();
+        } else if (!err || (err as any).name !== 'AbortError') {
+          fallbackCopy();
+        }
+      }
+    } else {
+      fallbackCopy();
+    }
   };
 
   const shareOrCopyLink = async () => {
     const inviteLink = `${window.location.origin}?room=${room.id}`;
+    
+    const fallbackCopy = () => {
+      navigator.clipboard.writeText(inviteLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    };
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -77,11 +103,15 @@ export const Lobby: React.FC = () => {
         });
       } catch (err) {
         console.error('Error al compartir:', err);
+        // Si el error no es porque el usuario canceló, usamos el portapapeles como respaldo.
+        if (err instanceof Error && err.name !== 'AbortError') {
+          fallbackCopy();
+        } else if (!err || (err as any).name !== 'AbortError') {
+           fallbackCopy();
+        }
       }
     } else {
-      navigator.clipboard.writeText(inviteLink);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
+      fallbackCopy();
     }
   };
 
@@ -101,8 +131,8 @@ export const Lobby: React.FC = () => {
             <span className="label">Código de Sala:</span>
             <div className="interactive-field">
               <span className="code">{room.id}</span>
-              <button onClick={copyCode} className="icon-btn" title="Copiar Código">
-                <Copy size={16} />
+              <button onClick={shareOrCopyCode} className="icon-btn" title="Compartir o Copiar Código">
+                <Share2 size={16} />
                 {copiedCode ? <span className="tooltip">¡Copiado!</span> : null}
               </button>
             </div>
