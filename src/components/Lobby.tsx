@@ -66,11 +66,23 @@ export const Lobby: React.FC = () => {
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const copyInviteLink = () => {
+  const shareOrCopyLink = async () => {
     const inviteLink = `${window.location.origin}?room=${room.id}`;
-    navigator.clipboard.writeText(inviteLink);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Verdad o Reto - ¡Únete a mi sala!',
+          text: `¡Únete a mi partida de Verdad o Reto! Usa el código: ${room.id}`,
+          url: inviteLink,
+        });
+      } catch (err) {
+        console.error('Error al compartir:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(inviteLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
   };
 
   return (
@@ -100,7 +112,7 @@ export const Lobby: React.FC = () => {
             <span className="label">Link de Invitación:</span>
             <div className="interactive-field">
               <span className="url-preview">invitar.juego/{room.id}</span>
-              <button onClick={copyInviteLink} className="icon-btn" title="Copiar Link">
+              <button onClick={shareOrCopyLink} className="icon-btn" title="Compartir o Copiar Link">
                 <Share2 size={16} />
                 {copiedLink ? <span className="tooltip">¡Copiado!</span> : null}
               </button>

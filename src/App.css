@@ -25,11 +25,10 @@
 .app-wrapper {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   position: relative;
-  overflow: hidden;
 }
 
 .main-content {
@@ -1177,7 +1176,7 @@
   width: 100%;
   max-width: 500px;
   padding: 32px;
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
 }
 
@@ -1491,7 +1490,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding: 24px;
   width: 100%;
 }
