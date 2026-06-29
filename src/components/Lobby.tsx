@@ -102,19 +102,19 @@ export const Lobby: React.FC = () => {
     <div className="lobby-container page-fade-in">
       <div className="lobby-card glass-card">
         {/* Lobby Header */}
-        <div className="lobby-header">
+        <div className="lobby-header" style={{ textAlign: 'center', marginBottom: '24px' }}>
           <span className="starter-badge">Lobby de Espera</span>
-          <h2>Sala de Juego</h2>
-          <p className="lobby-info-text">Comparte el código o el link de invitación para que otros se unan.</p>
+          <h2 style={{ marginTop: '12px', marginBottom: '8px' }}>Sala de Juego</h2>
+          <p className="lobby-info-text" style={{ margin: 0 }}>Comparte el código o el link de invitación para que otros se unan.</p>
         </div>
 
         {/* Access Codes Panel */}
         <div className="lobby-codes-panel" style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: 0 }}>
-          <div className="code-box" style={{ width: '100%', maxWidth: '500px', margin: '0 auto', padding: '20px 24px' }}>
+          <div className="code-box" style={{ width: '100%', maxWidth: '500px', margin: '0 auto', padding: '20px 24px', textAlign: 'center' }}>
             <span className="label" style={{ marginBottom: '12px', display: 'block', fontSize: '13px' }}>Código de Sala:</span>
-            <div className="interactive-field" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '12px' }}>
-              <span className="code" style={{ fontSize: '28px', letterSpacing: '2px', wordBreak: 'break-all' }}>{room.id}</span>
-              <div style={{ display: 'flex', gap: '8px', flexGrow: 1, justifyContent: 'flex-end' }}>
+            <div className="interactive-field" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '16px' }}>
+              <span className="code" style={{ fontSize: '28px', letterSpacing: '2px', wordBreak: 'break-all', textAlign: 'center' }}>{room.id}</span>
+              <div style={{ display: 'flex', gap: '8px', flexGrow: 1, justifyContent: 'center' }}>
                 <button onClick={copyCode} className="icon-btn" title="Copiar Código" style={{ width: '40px', height: '40px' }}>
                   <Copy size={18} />
                   {copiedCode ? <span className="tooltip">¡Copiado!</span> : null}
@@ -137,15 +137,15 @@ export const Lobby: React.FC = () => {
               </button>
             )}
           </div>
-          <div className="settings-chips" style={{ gap: '10px' }}>
-            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px' }}>
-              ⏱️ Tiempo de turno: {room.settings.turnTimeLimit > 0 ? `${room.settings.turnTimeLimit}s` : 'Ilimitado'}
+          <div className="settings-chips" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px', textAlign: 'center' }}>
+              ⏱️ Tiempo: {room.settings.turnTimeLimit > 0 ? `${room.settings.turnTimeLimit}s` : 'Ilimitado'}
             </span>
-            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px' }}>
-              🎁 Regalos de puntos: {room.settings.allowGiftingPoints ? 'Permitido' : 'Desactivado'}
+            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px', textAlign: 'center' }}>
+              🎁 Regalos: {room.settings.allowGiftingPoints ? 'Permitido' : 'No'}
             </span>
-            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px' }}>
-              🛒 Tienda de Habilidades: Activa (50 pts c/u)
+            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px', textAlign: 'center' }}>
+              🛒 Tienda: Activa
             </span>
           </div>
         </div>
