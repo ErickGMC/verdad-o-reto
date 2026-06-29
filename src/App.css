@@ -44,13 +44,11 @@
 
 /* Navigation Header */
 .main-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 32px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--glass-bg);
   backdrop-filter: var(--glass-blur);

@@ -112,15 +112,15 @@ export const Lobby: React.FC = () => {
         <div className="lobby-codes-panel" style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: 0 }}>
           <div className="code-box" style={{ width: '100%', maxWidth: '500px', margin: '0 auto', padding: '20px 24px' }}>
             <span className="label" style={{ marginBottom: '12px', display: 'block', fontSize: '13px' }}>Código de Sala:</span>
-            <div className="interactive-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px 20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-              <span className="code" style={{ fontSize: '32px', letterSpacing: '4px' }}>{room.id}</span>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={copyCode} className="icon-btn" title="Copiar Código" style={{ width: '44px', height: '44px' }}>
-                  <Copy size={20} />
+            <div className="interactive-field" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '12px' }}>
+              <span className="code" style={{ fontSize: '28px', letterSpacing: '2px', wordBreak: 'break-all' }}>{room.id}</span>
+              <div style={{ display: 'flex', gap: '8px', flexGrow: 1, justifyContent: 'flex-end' }}>
+                <button onClick={copyCode} className="icon-btn" title="Copiar Código" style={{ width: '40px', height: '40px' }}>
+                  <Copy size={18} />
                   {copiedCode ? <span className="tooltip">¡Copiado!</span> : null}
                 </button>
-                <button onClick={shareCode} className="icon-btn" title="Compartir Enlace" style={{ width: '44px', height: '44px', backgroundColor: 'var(--neon-purple)', color: '#fff', border: 'none', boxShadow: '0 0 10px rgba(168, 85, 247, 0.4)' }}>
-                  <Share2 size={20} />
+                <button onClick={shareCode} className="icon-btn" title="Compartir Enlace" style={{ width: '40px', height: '40px', backgroundColor: 'var(--neon-purple)', color: '#fff', border: 'none', boxShadow: '0 0 10px rgba(168, 85, 247, 0.4)' }}>
+                  <Share2 size={18} />
                 </button>
               </div>
             </div>
