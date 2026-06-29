@@ -76,7 +76,7 @@ export const Lobby: React.FC = () => {
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           fallbackCopy();
-        } else if (!err || (err as any).name !== 'AbortError') {
+        } else if (!err || (err as Error).name !== 'AbortError') {
           fallbackCopy();
         }
       }
@@ -106,7 +106,7 @@ export const Lobby: React.FC = () => {
         // Si el error no es porque el usuario canceló, usamos el portapapeles como respaldo.
         if (err instanceof Error && err.name !== 'AbortError') {
           fallbackCopy();
-        } else if (!err || (err as any).name !== 'AbortError') {
+        } else if (!err || (err as Error).name !== 'AbortError') {
            fallbackCopy();
         }
       }

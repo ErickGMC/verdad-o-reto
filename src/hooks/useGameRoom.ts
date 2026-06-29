@@ -98,6 +98,7 @@ const mockChannel = typeof window !== 'undefined' ? new BroadcastChannel('verdad
 // Helper to sanitize RTDB data (transforms objects with index keys back to arrays)
 function sanitizeRoomData(roomData: Record<string, unknown>): Room {
   if (!roomData) return roomData as unknown as Room;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sanitized = { ...roomData } as any;
   
   if (sanitized.playerOrder && !Array.isArray(sanitized.playerOrder)) {
@@ -106,6 +107,7 @@ function sanitizeRoomData(roomData: Record<string, unknown>): Room {
   if (!sanitized.playerOrder) sanitized.playerOrder = [];
 
   if (sanitized.players) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Object.values(sanitized.players).forEach((p: any) => {
       const player = p;
       if (player.skills && !Array.isArray(player.skills)) player.skills = Object.values(player.skills);
@@ -170,7 +172,6 @@ export function useGameRoom(roomId: string | null) {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
 
     if (isFirebaseConfigured && rtdb) {
