@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo } from 'react';
 import { useGameRoom } from '../hooks/useGameRoom';
 import type { Room, RoomSettings } from '../hooks/useGameRoom';
 
@@ -76,25 +76,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsExiting(false);
   };
 
+  const contextValue = useMemo(() => ({
+    ...game,
+    loading: game.loading || isExiting,
+    leaveRoom: exitRoom,
+    currentRoomId,
+    setRoomId: (id: string | null) => {
+      if (id === null) {
+        exitRoom();
+      } else {
+        setRoomId(id);
+      }
+    },
+    createRoom,
+    joinRoom,
+  }), [game, isExiting, currentRoomId]);
+
   // Wrap all actions to add context-level features if needed
   return (
-    <GameContext.Provider
-      value={{
-        ...game,
-        loading: game.loading || isExiting,
-        leaveRoom: exitRoom,
-        currentRoomId,
-        setRoomId: (id) => {
-          if (id === null) {
-            exitRoom();
-          } else {
-            setRoomId(id);
-          }
-        },
-        createRoom,
-        joinRoom,
-      }}
-    >
+    <GameContext.Provider value={contextValue}>
       {children}
     </GameContext.Provider>
   );

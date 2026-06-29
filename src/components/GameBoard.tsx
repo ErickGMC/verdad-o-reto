@@ -1,7 +1,41 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
 import { Gift, Check, X, Timer, Trophy, Crown, UserMinus } from 'lucide-react';
+
+const TurnTimer: React.FC<{
+  startedAt: number;
+  turnTimeLimit: number;
+  isMyTurn: boolean;
+  processingAction: string | null;
+  submitResponse: () => Promise<void>;
+  handleAction: (actionId: string, actionFn: () => Promise<void>) => Promise<void>;
+}> = ({ startedAt, turnTimeLimit, isMyTurn, processingAction, submitResponse, handleAction }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const remaining = Math.max(0, turnTimeLimit - elapsed);
+      setTimeLeft(remaining);
+
+      if (remaining === 0 && isMyTurn && !processingAction) {
+        handleAction('submit_response', submitResponse);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 500);
+    return () => clearInterval(interval);
+  }, [startedAt, turnTimeLimit, isMyTurn, processingAction, submitResponse, handleAction]);
+
+  return (
+    <div className={`turn-timer ${timeLeft <= 10 ? 'critical' : ''}`}>
+      <Timer size={18} />
+      <span>{timeLeft}s</span>
+    </div>
+  );
+};
 
 export const GameBoard: React.FC = () => {
   const {
@@ -18,7 +52,6 @@ export const GameBoard: React.FC = () => {
   } = useGame();
   const { showConfirm } = useAlert();
 
-  const [timeLeft, setTimeLeft] = useState<number>(0);
   const [giftTargetId, setGiftTargetId] = useState<string>('');
   const [giftAmount, setGiftAmount] = useState<number>(10);
   const [showGiftForm, setShowGiftForm] = useState<boolean>(false);
@@ -37,30 +70,7 @@ export const GameBoard: React.FC = () => {
   const isMyTurn = room?.currentTurn?.activePlayerId === playerId;
   const status = room?.status;
   const turnTimeLimit = room?.settings?.turnTimeLimit;
-  const startedAt = room?.currentTurn?.startedAt;
-
-  // Synchronized countdown timer hook
-  useEffect(() => {
-    if (!status || !startedAt || !turnTimeLimit || turnTimeLimit === 0 || status !== 'WAITING_RESPONSE') {
-      const timeout = setTimeout(() => setTimeLeft(0), 0);
-      return () => clearTimeout(timeout);
-    }
-
-    const updateTimer = () => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      const remaining = Math.max(0, turnTimeLimit - elapsed);
-      setTimeLeft(remaining);
-
-      // Active player triggers auto-submit if time runs out
-      if (remaining === 0 && isMyTurn && !processingAction) {
-        handleAction('submit_response', submitResponse);
-      }
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 500);
-    return () => clearInterval(interval);
-  }, [startedAt, status, turnTimeLimit, isMyTurn, submitResponse, processingAction, handleAction]);
+  const startedAt = room?.currentTurn?.startedAt || 0;
 
   const me = room?.players?.[playerId];
   
@@ -74,7 +84,18 @@ export const GameBoard: React.FC = () => {
   if (!room || !room.currentTurn) return null;
 
   const activePlayer = room.players[room.currentTurn.activePlayerId];
-  const playersList = Object.values(room.players);
+  const playersList = useMemo(() => Object.values(room.players), [room.players]);
+
+  const standings = useMemo(() => {
+    return [...playersList].sort((a, b) => {
+      const getOrder = (id: string) => {
+        const idx = room.playerOrder.indexOf(id);
+        if (idx === -1) return 999;
+        return (idx - room.currentTurnIdx + room.playerOrder.length) % room.playerOrder.length;
+      };
+      return getOrder(a.id) - getOrder(b.id);
+    });
+  }, [playersList, room.playerOrder, room.currentTurnIdx]);
 
   // Count voters
   const totalVoters = room.playerOrder.length - 1;
@@ -83,11 +104,11 @@ export const GameBoard: React.FC = () => {
   const allVoted = totalVotesCast >= totalVoters;
 
   // Calculate vote tally
-  const positiveVotes = Object.values(currentVotes).filter((v) => v === 'COMPLIED').length;
+  const positiveVotes = useMemo(() => Object.values(currentVotes).filter((v) => v === 'COMPLIED').length, [currentVotes]);
   const passed = totalVoters === 0 ? true : positiveVotes > totalVoters / 2;
 
   // Points gift submit handler
-  const handleGiftPoints = (e: React.FormEvent) => {
+  const handleGiftPoints = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!me) return;
     const finalAmount = Math.min(giftAmount, me.score);
@@ -95,7 +116,7 @@ export const GameBoard: React.FC = () => {
     handleAction('gift', () => giftPoints(giftTargetId, finalAmount)).then(() => {
       setShowGiftForm(false);
     });
-  };
+  }, [me, giftAmount, giftTargetId, handleAction, giftPoints]);
 
   if (status === 'FINISHED') {
     const sortedPlayers = [...playersList].sort((a, b) => b.score - a.score);
@@ -151,10 +172,14 @@ export const GameBoard: React.FC = () => {
             </div>
           </div>
           {room.settings.turnTimeLimit > 0 && room.status === 'WAITING_RESPONSE' && (
-            <div className={`turn-timer ${timeLeft <= 10 ? 'critical' : ''}`}>
-              <Timer size={18} />
-              <span>{timeLeft}s</span>
-            </div>
+            <TurnTimer
+              startedAt={startedAt}
+              turnTimeLimit={room.settings.turnTimeLimit}
+              isMyTurn={isMyTurn}
+              processingAction={processingAction}
+              submitResponse={submitResponse}
+              handleAction={handleAction}
+            />
           )}
         </div>
 
@@ -335,15 +360,7 @@ export const GameBoard: React.FC = () => {
             )}
           </div>
           <div className="standings-list">
-            {playersList
-              .sort((a, b) => {
-                 const getOrder = (id: string) => {
-                    const idx = room.playerOrder.indexOf(id);
-                    if (idx === -1) return 999;
-                    return (idx - room.currentTurnIdx + room.playerOrder.length) % room.playerOrder.length;
-                 };
-                 return getOrder(a.id) - getOrder(b.id);
-              })
+            {standings
               .map((p, idx) => {
                 const isActive = p.id === room.currentTurn?.activePlayerId;
                 return (

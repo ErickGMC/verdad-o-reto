@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
 import { Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save, Copy } from 'lucide-react';
@@ -18,7 +18,7 @@ export const Lobby: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
 
-  const handleAction = async (actionId: string, actionFn: () => Promise<void>) => {
+  const handleAction = useCallback(async (actionId: string, actionFn: () => Promise<void>) => {
     if (processingAction) return;
     setProcessingAction(actionId);
     try {
@@ -26,11 +26,11 @@ export const Lobby: React.FC = () => {
     } finally {
       setProcessingAction(null);
     }
-  };
+  }, [processingAction]);
 
   if (!room) return null;
 
-  const playersList = Object.values(room.players);
+  const playersList = useMemo(() => Object.values(room.players), [room.players]);
   const me = room.players[playerId];
   const isCreator = room.creatorId === playerId;
 
@@ -54,11 +54,15 @@ export const Lobby: React.FC = () => {
   };
 
   // Check if all players (excluding the creator) are ready
-  const allOtherPlayersReady = playersList
-    .filter((p) => p.id !== room.creatorId)
-    .every((p) => p.isReady);
+  const allOtherPlayersReady = useMemo(() => {
+    return playersList
+      .filter((p) => p.id !== room.creatorId)
+      .every((p) => p.isReady);
+  }, [playersList, room.creatorId]);
 
   const canStart = isCreator && playersList.length >= 2 && allOtherPlayersReady;
+
+  const getInviteLink = () => `${window.location.origin}/?room=${room.id}`;
 
   const copyCode = () => {
     navigator.clipboard.writeText(room.id);
@@ -67,21 +71,30 @@ export const Lobby: React.FC = () => {
   };
 
   const shareCode = async () => {
+    const inviteLink = getInviteLink();
+    const shareText = `¡Únete a mi sala de Verdad o Reto! Código: ${room.id}`;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Código de Verdad o Reto',
-          text: `El código de mi sala en Verdad o Reto es: ${room.id}`,
+          title: 'Verdad o Reto - Invitación',
+          text: shareText,
+          url: inviteLink,
         });
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
-          copyCode();
+          navigator.clipboard.writeText(`${shareText} - ${inviteLink}`);
+          setCopiedCode(true);
+          setTimeout(() => setCopiedCode(false), 2000);
         } else if (!err || (err as Error).name !== 'AbortError') {
-          copyCode();
+          navigator.clipboard.writeText(`${shareText} - ${inviteLink}`);
+          setCopiedCode(true);
+          setTimeout(() => setCopiedCode(false), 2000);
         }
       }
     } else {
-      copyCode();
+      navigator.clipboard.writeText(`${shareText} - ${inviteLink}`);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
     }
   };
 
@@ -96,18 +109,18 @@ export const Lobby: React.FC = () => {
         </div>
 
         {/* Access Codes Panel */}
-        <div className="lobby-codes-panel">
-          <div className="code-box" style={{ maxWidth: '400px', margin: '0 auto' }}>
-            <span className="label">Código de Sala:</span>
-            <div className="interactive-field">
-              <span className="code">{room.id}</span>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button onClick={copyCode} className="icon-btn" title="Copiar Código">
-                  <Copy size={16} />
+        <div className="lobby-codes-panel" style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: 0 }}>
+          <div className="code-box" style={{ width: '100%', maxWidth: '500px', margin: '0 auto', padding: '20px 24px' }}>
+            <span className="label" style={{ marginBottom: '12px', display: 'block', fontSize: '13px' }}>Código de Sala:</span>
+            <div className="interactive-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px 20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <span className="code" style={{ fontSize: '32px', letterSpacing: '4px' }}>{room.id}</span>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={copyCode} className="icon-btn" title="Copiar Código" style={{ width: '44px', height: '44px' }}>
+                  <Copy size={20} />
                   {copiedCode ? <span className="tooltip">¡Copiado!</span> : null}
                 </button>
-                <button onClick={shareCode} className="icon-btn" title="Compartir Código">
-                  <Share2 size={16} />
+                <button onClick={shareCode} className="icon-btn" title="Compartir Enlace" style={{ width: '44px', height: '44px', backgroundColor: 'var(--neon-purple)', color: '#fff', border: 'none', boxShadow: '0 0 10px rgba(168, 85, 247, 0.4)' }}>
+                  <Share2 size={20} />
                 </button>
               </div>
             </div>
@@ -115,32 +128,35 @@ export const Lobby: React.FC = () => {
         </div>
 
         {/* Room configurations info */}
-        <div className="lobby-settings-info">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h3 style={{ margin: 0 }}>Reglas de la Sala:</h3>
+        <div className="lobby-settings-info" style={{ padding: '24px', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0, fontSize: '15px' }}>Reglas de la Sala:</h3>
             {isCreator && (
-              <button className="cta-button link-btn" onClick={() => setShowSettings(true)} style={{ fontSize: '12px', padding: '4px 8px' }}>
-                <Settings size={14} style={{ display: 'inline', marginRight: '4px' }} /> Configurar
+              <button className="cta-button link-btn" onClick={() => setShowSettings(true)} style={{ fontSize: '13px', padding: '6px 12px' }}>
+                <Settings size={15} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }} /> Configurar
               </button>
             )}
           </div>
-          <div className="settings-chips">
-            <span className="settings-chip">
+          <div className="settings-chips" style={{ gap: '10px' }}>
+            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px' }}>
               ⏱️ Tiempo de turno: {room.settings.turnTimeLimit > 0 ? `${room.settings.turnTimeLimit}s` : 'Ilimitado'}
             </span>
-            <span className="settings-chip">
+            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px' }}>
               🎁 Regalos de puntos: {room.settings.allowGiftingPoints ? 'Permitido' : 'Desactivado'}
             </span>
-            <span className="settings-chip">
+            <span className="settings-chip" style={{ fontSize: '12px', padding: '6px 12px' }}>
               🛒 Tienda de Habilidades: Activa (50 pts c/u)
             </span>
           </div>
         </div>
 
         {/* Connected Players list */}
-        <div className="lobby-players-section">
-          <h3>Jugadores Unidos ({playersList.length}):</h3>
-          <div className="players-list">
+        <div className="lobby-players-section" style={{ padding: '24px', backgroundColor: 'rgba(168, 85, 247, 0.03)', borderRadius: '16px', border: '1px solid rgba(168, 85, 247, 0.1)' }}>
+          <h3 style={{ fontSize: '15px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Jugadores Unidos:</span>
+            <span style={{ backgroundColor: 'var(--bg-tertiary)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>{playersList.length} / 8</span>
+          </h3>
+          <div className="players-list" style={{ gap: '12px' }}>
             {playersList.map((player) => {
               const isPlayerCreator = player.id === room.creatorId;
               return (
