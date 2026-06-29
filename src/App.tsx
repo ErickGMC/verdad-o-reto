@@ -12,7 +12,6 @@ const SkillShop = lazy(() => import('./components/SkillShop').then(m => ({ defau
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const AboutModal = lazy(() => import('./components/AboutModal').then(m => ({ default: m.AboutModal })));
 const InstructionsModal = lazy(() => import('./components/InstructionsModal').then(m => ({ default: m.InstructionsModal })));
-import './App.css';
 
 const AVATARS = ['🦊', '🐯', '🐼', '🐸', '🐙', '🦄', '🦖', '🦁', '🐱', '🍕', '🚀', '💎'];
 

@@ -84,7 +84,7 @@ export const GameBoard: React.FC = () => {
 
   // Calculate vote tally
   const positiveVotes = Object.values(currentVotes).filter((v) => v === 'COMPLIED').length;
-  const passed = positiveVotes > 0 && positiveVotes >= Math.ceil(totalVoters / 2);
+  const passed = totalVoters === 0 ? true : positiveVotes > totalVoters / 2;
 
   // Points gift submit handler
   const handleGiftPoints = (e: React.FormEvent) => {

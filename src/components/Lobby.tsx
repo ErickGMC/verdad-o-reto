@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
-import { Copy, Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save } from 'lucide-react';
+import { Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
 import type { RoomSettings } from '../hooks/useGameRoom';
 

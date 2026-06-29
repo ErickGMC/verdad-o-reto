@@ -98,7 +98,7 @@ const mockChannel = typeof window !== 'undefined' ? new BroadcastChannel('verdad
 // Helper to sanitize RTDB data (transforms objects with index keys back to arrays)
 function sanitizeRoomData(roomData: Record<string, unknown>): Room {
   if (!roomData) return roomData as unknown as Room;
-  const sanitized = { ...roomData } as Record<string, unknown>;
+  const sanitized = { ...roomData } as any;
   
   if (sanitized.playerOrder && !Array.isArray(sanitized.playerOrder)) {
     sanitized.playerOrder = Object.values(sanitized.playerOrder);
@@ -106,8 +106,8 @@ function sanitizeRoomData(roomData: Record<string, unknown>): Room {
   if (!sanitized.playerOrder) sanitized.playerOrder = [];
 
   if (sanitized.players) {
-    Object.values(sanitized.players).forEach((p: unknown) => {
-      const player = p as Record<string, unknown>;
+    Object.values(sanitized.players).forEach((p: any) => {
+      const player = p;
       if (player.skills && !Array.isArray(player.skills)) player.skills = Object.values(player.skills);
       if (!player.skills) player.skills = [];
     });
@@ -620,7 +620,7 @@ export function useGameRoom(roomId: string | null) {
       const positiveVotes = votesList.filter(v => v === 'COMPLIED').length;
       
       const totalVoters = current.playerOrder.length - 1;
-      const isSuccess = positiveVotes > totalVoters / 2;
+      const isSuccess = totalVoters === 0 ? true : positiveVotes > totalVoters / 2;
 
       let scoreAwarded = 0;
       if (isSuccess && current.currentTurn.typeSelected) {
