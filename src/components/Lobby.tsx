@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { useAlert } from '../context/AlertContext';
-import { Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save } from 'lucide-react';
+import { Share2, Crown, AlertCircle, UserMinus, Settings, Edit2, Save, Copy } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
 import type { RoomSettings } from '../hooks/useGameRoom';
 
@@ -60,13 +60,13 @@ export const Lobby: React.FC = () => {
 
   const canStart = isCreator && playersList.length >= 2 && allOtherPlayersReady;
 
-  const shareOrCopyCode = async () => {
-    const fallbackCopy = () => {
-      navigator.clipboard.writeText(room.id);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    };
+  const copyCode = () => {
+    navigator.clipboard.writeText(room.id);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
+  const shareCode = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
@@ -75,43 +75,13 @@ export const Lobby: React.FC = () => {
         });
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
-          fallbackCopy();
+          copyCode();
         } else if (!err || (err as Error).name !== 'AbortError') {
-          fallbackCopy();
+          copyCode();
         }
       }
     } else {
-      fallbackCopy();
-    }
-  };
-
-  const shareOrCopyLink = async () => {
-    const inviteLink = `${window.location.origin}?room=${room.id}`;
-    
-    const fallbackCopy = () => {
-      navigator.clipboard.writeText(inviteLink);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Verdad o Reto - ¡Únete a mi sala!',
-          text: `¡Únete a mi partida de Verdad o Reto! Usa el código: ${room.id}`,
-          url: inviteLink,
-        });
-      } catch (err) {
-        console.error('Error al compartir:', err);
-        // Si el error no es porque el usuario canceló, usamos el portapapeles como respaldo.
-        if (err instanceof Error && err.name !== 'AbortError') {
-          fallbackCopy();
-        } else if (!err || (err as Error).name !== 'AbortError') {
-           fallbackCopy();
-        }
-      }
-    } else {
-      fallbackCopy();
+      copyCode();
     }
   };
 
@@ -127,25 +97,19 @@ export const Lobby: React.FC = () => {
 
         {/* Access Codes Panel */}
         <div className="lobby-codes-panel">
-          <div className="code-box">
+          <div className="code-box" style={{ maxWidth: '400px', margin: '0 auto' }}>
             <span className="label">Código de Sala:</span>
             <div className="interactive-field">
               <span className="code">{room.id}</span>
-              <button onClick={shareOrCopyCode} className="icon-btn" title="Compartir o Copiar Código">
-                <Share2 size={16} />
-                {copiedCode ? <span className="tooltip">¡Copiado!</span> : null}
-              </button>
-            </div>
-          </div>
-
-          <div className="code-box">
-            <span className="label">Link de Invitación:</span>
-            <div className="interactive-field">
-              <span className="url-preview">invitar.juego/{room.id}</span>
-              <button onClick={shareOrCopyLink} className="icon-btn" title="Compartir o Copiar Link">
-                <Share2 size={16} />
-                {copiedLink ? <span className="tooltip">¡Copiado!</span> : null}
-              </button>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={copyCode} className="icon-btn" title="Copiar Código">
+                  <Copy size={16} />
+                  {copiedCode ? <span className="tooltip">¡Copiado!</span> : null}
+                </button>
+                <button onClick={shareCode} className="icon-btn" title="Compartir Código">
+                  <Share2 size={16} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
