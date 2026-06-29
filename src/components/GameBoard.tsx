@@ -69,7 +69,6 @@ export const GameBoard: React.FC = () => {
 
   const isMyTurn = room?.currentTurn?.activePlayerId === playerId;
   const status = room?.status;
-  const turnTimeLimit = room?.settings?.turnTimeLimit;
   const startedAt = room?.currentTurn?.startedAt || 0;
 
   const me = room?.players?.[playerId];
