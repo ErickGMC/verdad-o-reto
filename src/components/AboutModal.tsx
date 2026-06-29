@@ -37,28 +37,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             </p>
 
             <div className="support-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-              <div className="yape-container" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', backgroundColor: 'rgba(106, 27, 154, 0.1)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(106, 27, 154, 0.3)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', backgroundColor: '#6a1b9a', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
-                    ☕
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Invitar un café vía Yape</span>
-                    <strong style={{ color: '#6a1b9a', fontSize: '18px', letterSpacing: '0px' }}>Al Creador</strong>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => {
-                     navigator.clipboard.writeText('997346193');
-                     alert('¡Número oculto del creador copiado! Se abrirá la app de Yape para que lo pegues y envíes tu apoyo.');
-                     // Intentar abrir Yape mediante deep link
-                     window.location.href = 'yape://';
-                  }}
-                  className="cta-button primary" 
-                  style={{ backgroundColor: '#6a1b9a', color: '#fff', border: 'none', width: '100%', marginTop: '8px', boxShadow: '0 4px 15px rgba(106, 27, 154, 0.4)' }}
-                >
-                  Copiar Número y Abrir Yape
-                </button>
+              <div className="qr-container" style={{ background: '#fff', padding: '10px', borderRadius: '16px', display: 'inline-block' }}>
+                <img src="/yape-qr.png" alt="Yape QR" style={{ width: '150px', height: '150px', display: 'block', borderRadius: '8px' }} />
               </div>
               <div style={{ flex: '1 1 200px' }}>
                 <p className="contact-note" style={{ margin: 0, color: 'var(--text-secondary)' }}>
